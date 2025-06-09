@@ -81,15 +81,21 @@ function resizeCanvas() {
   }
 }
 resizeCanvas();    
+
+let paddleHeads = 3; // starter med 3
+const maxPaddleHeads = 6;
+const headUnit = canvas.width / 12; // bredde per hode
+
 let paddle = {
-  width: canvas.width / 5,
+  width: paddleHeads * headUnit,
   height: 40,
-  x: canvas.width / 2 - canvas.width / 10,
-  y: isMobile ? canvas.height - 300 : canvas.height - 100
+  x: canvas.width / 2 - (paddleHeads * headUnit) / 2,
+  y: isMobile ? canvas.height - 500 : canvas.height - 100
 };
+
 let initialSpeed = 1.5; // Startfart for ballen
 
-const MAX_SPEED_MULTIPLIER = 5;
+const MAX_SPEED_MULTIPLIER = 4;
 
 let ball = {
   x: paddle.x + paddle.width / 2,
@@ -101,10 +107,10 @@ let ball = {
     let rightPressed = false;
     let leftPressed = false;
     let bricks = [];
-    let rows = 7;
-    let cols = 8;
-    let brickWidth = canvas.width / 10;
-    let brickHeight = canvas.height / 25;
+    let rows = 10; // Antall rader med murstein
+    let cols = 12; // Antall kolonner med murstein
+    let brickWidth = (canvas.width - 40) / cols - 5; // 5 px mellomrom
+    let brickHeight = (canvas.height / 3) / rows - 4; // tynnere og høyere dekning
 
     let score = 0;
     let lives = 3;
@@ -131,15 +137,17 @@ canvas.addEventListener('touchmove', e => {
 
     requestAnimationFrame(draw); // Start rendering loop to show start screen
 
-    for (let r = 0; r < rows; r++) {
-      bricks[r] = [];
-      for (let c = 0; c < cols; c++) {
-        bricks[r][c] = { 
-          x: c * (brickWidth + 10) + 35, 
-          y: r * (brickHeight + 10) + 80, 
-          destroyed: false };
-      }
-    }
+for (let r = 0; r < rows; r++) {
+  bricks[r] = [];
+  for (let c = 0; c < cols; c++) {
+    bricks[r][c] = {
+    x: c * (brickWidth + 5) + 20,
+    y: r * (brickHeight + 4) + 80,
+    destroyed: false,
+    special: Math.random() < 0.2  // 20% sjanse for rød blokk
+  };
+}
+}
 
     document.addEventListener("keydown", e => {
       if (e.key === "r" && gameOver) {
@@ -209,7 +217,7 @@ canvas.addEventListener("touchstart", e => {
           if (!b.destroyed) {
             ctx.beginPath();
             ctx.rect(b.x, b.y, brickWidth, brickHeight);
-            ctx.fillStyle = "#09f";
+            ctx.fillStyle = b.special ? "#f00" : "#09f"; // Rød for spesielle blokker
             ctx.fill();
             ctx.closePath();
           }
@@ -243,15 +251,23 @@ canvas.addEventListener("touchstart", e => {
 
     // Kollisjon med padelen
     if (
-      t.y >= paddle.y &&
-      t.x > paddle.x &&
-      t.x < paddle.x + paddle.width &&
-      !t.hit
-    ) {
-      score++;
-      t.hit = true;
-      t.frame = 0; // start animasjon
-    }
+  t.y >= paddle.y &&
+  t.x > paddle.x &&
+  t.x < paddle.x + paddle.width &&
+  !t.hit
+) {
+  score++;
+  t.hit = true;
+  t.frame = 0; // start animasjon
+
+  // 🚀 Utvid padel hvis det er bonus-type
+  if (t.bonus === "extend" && paddleHeads < maxPaddleHeads) {
+    paddleHeads++;
+    paddle.width = paddleHeads * headUnit;
+    paddle.x = Math.max(0, paddle.x - headUnit / 2); // bevar senter
+  }
+}
+
 
     // animasjon etter treff
     if (t.hit) {
@@ -266,39 +282,57 @@ canvas.addEventListener("touchstart", e => {
 }
 
     function collisionDetection() {
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const b = bricks[r][c];
-          if (!b.destroyed) {
-            if (
-              ball.x > b.x && ball.x < b.x + brickWidth &&
-              ball.y > b.y && ball.y < b.y + brickHeight
-            ) {
-              // Snu retning
-              ball.dy = -ball.dy;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const b = bricks[r][c];
+      if (!b.destroyed) {
+        const hitX = ball.x > b.x && ball.x < b.x + brickWidth;
+        const hitY = ball.y > b.y && ball.y < b.y + brickHeight;
 
-              // Øk fart, men begrens til maks 5x
-              const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-              const maxSpeed = initialSpeed * MAX_SPEED_MULTIPLIER;
+        if (hitX && hitY) {
+          // Snu retning
+          ball.dy = -ball.dy;
 
-            if (speed < maxSpeed) {
-              const speedIncrease = 0.2;
-              const newSpeed = Math.min(speed + speedIncrease, maxSpeed);
+          // Øk fart, men begrens til maks 5x
+          const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+          const maxSpeed = initialSpeed * MAX_SPEED_MULTIPLIER;
 
-              // Behold retning
-              const angle = Math.atan2(ball.dy, ball.dx);
-              ball.dx = newSpeed * Math.cos(angle);
-              ball.dy = newSpeed * Math.sin(angle);
-            }
+          if (speed < maxSpeed) {
+            const speedIncrease = 0.2;
+            const newSpeed = Math.min(speed + speedIncrease, maxSpeed);
+            const angle = Math.atan2(ball.dy, ball.dx);
+            ball.dx = newSpeed * Math.cos(angle);
+            ball.dy = newSpeed * Math.sin(angle);
+          }
 
-              b.destroyed = true;
-              score++;
-              fallingTexts.push({ text: "POES", x: b.x + brickWidth / 2, y: b.y, speed: 2 });
-            }
+          // Merk som ødelagt og legg til fallende tekst
+          b.destroyed = true;
+          score++;
+
+          if (b.special) {
+            fallingTexts.push({
+              text: "POES",
+              x: b.x + brickWidth / 2,
+              y: b.y,
+              speed: 2,
+              color: "red",
+              bonus: "extend"
+            });
+          } else {
+            fallingTexts.push({
+              text: "POES",
+              x: b.x + brickWidth / 2,
+              y: b.y,
+              speed: 2,
+              color: "white"
+            });
           }
         }
       }
     }
+  }
+}
+
 
     function drawScore() {
       ctx.font = "16px Arial";
