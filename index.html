@@ -61,6 +61,12 @@
 </script>
   <script>
     
+    let extraBalls = [];
+    let showPoesklap = false;
+    let poesklapTimer = 0;
+    let pausedBallVelocity = { dx: 0, dy: 0 };
+
+
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const hitSound = new Audio("https://freesound.org/data/previews/341/341695_5260877-lq.mp3");
     hitSound.volume = 0.5; // Juster volumet for trefflyd
@@ -173,17 +179,21 @@ for (let r = 0; r < rows; r++) {
 
 
     const isSausageBonus = Math.random() < 0.1; // 10% sjanse for pølseblokk
+    const isExtraBall = !isSausageBonus && Math.random() < 0.05; // 5% sjanse
+
 
     // Start med et tomt objekt
     const brick = {
-      x: c * (brickWidth + 5) + 20,
-      y: r * (brickHeight + 4) + 80,
-      destroyed: false,
-      bonusScore: isSausageBonus,
-      strength: isSausageBonus ? 1 : (isStrong ? 5 : 1), // pølse = 1
-      special: !isSausageBonus && Math.random() < 0.2,
-      effect: null
-    };
+  x: c * (brickWidth + 5) + 20,
+  y: r * (brickHeight + 4) + 80,
+  destroyed: false,
+  bonusScore: isSausageBonus,
+  strength: isSausageBonus ? 1 : (isStrong ? 5 : 1),
+  special: !isSausageBonus && !isExtraBall && Math.random() < 0.2,
+  extraBall: isExtraBall,
+  effect: null
+};
+
 
     // 🎯 Hvis det er en pølseblokk, sett kun bonusScore
     if (isSausageBonus) {
@@ -229,12 +239,21 @@ canvas.addEventListener("touchstart", e => {
 
 
     function drawBall() {
-      ctx.beginPath();
-      ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-      ctx.fillStyle = "#f00";
-      ctx.fill();
-      ctx.closePath();
-    }
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.fillStyle = "#f00";
+  ctx.fill();
+  ctx.closePath();
+
+  extraBalls.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#0f0"; // ekstra ball er grønn
+    ctx.fill();
+    ctx.closePath();
+  });
+}
+
 
     function drawPaddle() {
   const headWidth = paddle.width / paddleHeads;
@@ -277,15 +296,15 @@ function interpolateColor(c1, c2, t) {
 
 
    function drawBricks() {
- if (!brickWidth || brickWidth === 0) return; // beskytt mot feil
+  if (!brickWidth || brickWidth === 0) return;
   const shineOffset = (Date.now() / 15) % brickWidth;
-   
-    for (let r = 0; r < rows; r++) {
+
+  for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const b = bricks[r][c];
       if (b.destroyed) continue;
 
-      // 🌭 Pølseblokk
+      // 🌭 Pølseblokk med bilde og blinking
       if (b.bonusScore) {
         if (sausageImg.complete && sausageImg.naturalWidth > 0) {
           if (Math.floor(Date.now() / 250) % 2 === 0) {
@@ -298,19 +317,26 @@ function interpolateColor(c1, c2, t) {
         continue; // hopp over videre tegning
       }
 
-      // 🎨 Velg farge basert på type og styrke
+      // 🎾 Ekstra ball-blokk: GRØNN
+      if (b.extraBall) {
+        const blink = Math.floor(Date.now() / 200) % 2 === 0;
+        ctx.fillStyle = blink ? "#00ff00" : "#007700";
+        ctx.fillRect(b.x, b.y, brickWidth, brickHeight);
+        continue;
+      }
+
+      // 🎨 Farge basert på type og styrke
       let baseColor = "#0099ff"; // standard blå
+
       if (b.special) {
-        baseColor = b.strength > 1 ? "#5c0000" : "#ff0000"; // rød for spesialblokker
+        baseColor = b.strength > 1 ? "#5c0000" : "#ff0000"; // mørkere rød om sterk
       } else if (b.strength > 1) {
-  // Jo lavere strength, desto lysere farge
-  const t = b.strength / 5; // antar maks er 5
-  baseColor = interpolateColor("#000000", "#004488", 1 - t);
-}
+        const t = b.strength / 5; // 1.0 = sterk, 0 = svak
+        baseColor = interpolateColor("#000000", "#004488", 1 - t); // blir lysere når styrke går ned
+      }
 
-
-      // ✨ Lag glinsende gradient
-      let gradient = ctx.createLinearGradient(b.x, b.y, b.x + brickWidth, b.y);
+      // ✨ Skinnende gradient
+      const gradient = ctx.createLinearGradient(b.x, b.y, b.x + brickWidth, b.y);
       gradient.addColorStop(0, lightenColor(baseColor, 0.05));
       gradient.addColorStop(shineOffset / brickWidth, lightenColor(baseColor, 0.5));
       gradient.addColorStop(1, lightenColor(baseColor, 0.05));
@@ -323,6 +349,7 @@ function interpolateColor(c1, c2, t) {
     }
   }
 }
+
 
 
 
@@ -405,48 +432,53 @@ function updateFallingTexts() {
 
 
 function collisionDetection() {
+  // 🔴 Kollisjon for hovedball
+  detectBallCollision(ball);
+
+  // 🟢 Kollisjon for ekstra baller
+  extraBalls.forEach(b => detectBallCollision(b));
+}
+
+function detectBallCollision(b) {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const b = bricks[r][c];
-      if (b.destroyed) continue;
+      const brick = bricks[r][c];
+      if (brick.destroyed) continue;
 
-      const hitX = ball.x > b.x && ball.x < b.x + brickWidth;
-      const hitY = ball.y > b.y && ball.y < b.y + brickHeight;
+      const hitX = b.x > brick.x && b.x < brick.x + brickWidth;
+      const hitY = b.y > brick.y && b.y < brick.y + brickHeight;
 
       if (hitX && hitY) {
-        // 🔄 Snu ballretning
-        ball.dy = -ball.dy;
+        b.dy = -b.dy;
 
-        // 🔊 Spill treff-lyd
+        // Spill lyd
         if (hitSound) {
           hitSound.currentTime = 0;
           hitSound.play();
         }
 
-        // 🚀 Øk fart (opp til maks 5x)
-        const speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-        const maxSpeed = initialSpeed * MAX_SPEED_MULTIPLIER;
-
-        if (speed < maxSpeed) {
-          const speedIncrease = 0.03;
-          const newSpeed = Math.min(speed + speedIncrease, maxSpeed);
-          const angle = Math.atan2(ball.dy, ball.dx);
-          ball.dx = newSpeed * Math.cos(angle);
-          ball.dy = newSpeed * Math.sin(angle);
+        // Poesklap pause kun for hovedball
+        if (brick.extraBall && b === ball) {
+          showPoesklap = true;
+          poesklapTimer = Date.now();
+          pausedBallVelocity.dx = b.dx;
+          pausedBallVelocity.dy = b.dy;
+          b.dx = 0;
+          b.dy = 0;
         }
 
-        // 🔧 Håndter styrke og poeng
-        b.strength--;
-        if (b.strength <= 0) {
-          b.destroyed = true;
+        // Reduser styrke
+        brick.strength--;
+        if (brick.strength <= 0) {
+          brick.destroyed = true;
 
-          if (b.bonusScore) {
-            // 🌭 Pølseblokk: gullfarget blinkende tekst og 50 poeng
+          // 🌭 Pølsebonus
+          if (brick.bonusScore) {
             score += 50;
             fallingTexts.push({
               text: "50",
-              x: b.x + brickWidth / 2,
-              y: b.y,
+              x: brick.x + brickWidth / 2,
+              y: brick.y,
               speed: 2,
               color: "gold",
               blink: true,
@@ -454,19 +486,18 @@ function collisionDetection() {
               frame: 0
             });
           } else {
-            // Vanlig eller spesialblokk
             score += 1;
-            const color = b.special ? "red" : "white";
+            const color = brick.special ? "red" : "white";
             fallingTexts.push({
               text: "POES",
-              x: b.x + brickWidth / 2,
-              y: b.y,
+              x: brick.x + brickWidth / 2,
+              y: brick.y,
               speed: 2,
               color,
               blink: false,
               hit: false,
               frame: 0,
-              bonus: b.effect || null
+              bonus: brick.effect || null
             });
           }
         }
@@ -474,6 +505,7 @@ function collisionDetection() {
     }
   }
 }
+
 
 
 
@@ -517,6 +549,37 @@ function collisionDetection() {
 
     function draw() {
       
+      if (showPoesklap) {
+  const elapsed = Date.now() - poesklapTimer;
+  ctx.fillStyle = elapsed % 500 < 250 ? "yellow" : "orange";
+  ctx.font = "bold 60px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
+
+  if (elapsed >= 3000) {
+    showPoesklap = false;
+
+     // Gjenopprett fart til hovedball
+  ball.dx = pausedBallVelocity.dx;
+  ball.dy = pausedBallVelocity.dy;
+
+    // Legg til en ny ball
+    extraBalls.push({
+      x: paddle.x + paddle.width / 2,
+      y: paddle.y - 10,
+      dx: 1,
+      dy: -1,
+      radius: 8
+    });
+
+    // Sett fart tilbake på hovedballen
+    if (!gameStarted) startGame();
+  }
+
+  requestAnimationFrame(draw);
+  return;
+}
+
       
       if (gameOver) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -651,6 +714,33 @@ function collisionDetection() {
       if (leftPressed && paddle.x > 0) paddle.x -= 2.5;
 
       requestAnimationFrame(draw);
+
+      extraBalls.forEach(b => {
+  b.x += b.dx;
+  b.y += b.dy;
+
+  // Kollisjon med vegger
+  if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
+  if (b.y < b.radius) b.dy *= -1;
+
+  // Treff padel
+  if (
+    b.y + b.dy > canvas.height - b.radius - paddle.height - 10 &&
+    b.x > paddle.x &&
+    b.x < paddle.x + paddle.width
+  ) {
+    b.dy = -Math.abs(b.dy);
+  }
+
+  // Ute av skjerm
+  if (b.y > canvas.height) {
+    b.toRemove = true;
+  }
+});
+
+// Fjern baller som har falt ut
+extraBalls = extraBalls.filter(b => !b.toRemove);
+
     }
   </script>
 </body>
