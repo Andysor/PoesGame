@@ -30,6 +30,7 @@
   <canvas id="arkanoid" width="600" height="400"></canvas>
 
   <script>
+  
     const canvas = document.getElementById('arkanoid');
     const ctx = canvas.getContext('2d');
 
@@ -50,6 +51,19 @@
     let gameStarted = false;
     let gameOver = false;
     let fallingTexts = [];
+
+   // 📱 Mobilvennlig touchkontroll
+canvas.addEventListener('touchstart', e => {
+  const touch = e.touches[0];
+  paddle.x = touch.clientX - canvas.getBoundingClientRect().left - paddle.width / 2;
+});
+
+canvas.addEventListener('touchmove', e => {
+  const touch = e.touches[0];
+  paddle.x = touch.clientX - canvas.getBoundingClientRect().left - paddle.width / 2;
+  e.preventDefault();
+}, { passive: false 
+});
 
     requestAnimationFrame(draw); // Start rendering loop to show start screen
 
@@ -73,6 +87,25 @@
       if (e.key === "ArrowRight") rightPressed = false;
       if (e.key === "ArrowLeft") leftPressed = false;
     });
+
+// Touchstart for mobil
+canvas.addEventListener("touchstart", e => {
+  if (gameOver) {
+    document.location.reload();
+  } else if (!gameStarted) {
+    startGame();
+  }
+});
+
+
+document.addEventListener("touchstart", e => {
+  if (gameOver) {
+    document.location.reload();
+  } else if (!gameStarted) {
+    startGame();
+  }
+});
+
 
     function drawBall() {
       ctx.beginPath();
