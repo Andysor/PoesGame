@@ -174,44 +174,49 @@ canvas.addEventListener('touchmove', e => {
 for (let r = 0; r < rows; r++) {
   bricks[r] = [];
   for (let c = 0; c < cols; c++) {
-   const isStrong = r < rows - 1 && (rows - r - 2) % 2 === 0;
+    const isStrong = r < rows - 1 && (rows - r - 2) % 2 === 0;
 
+    const isSausageBonus = Math.random() < 0.1;
+    const isExtraBall = Math.random() < 0.05;
 
-
-    const isSausageBonus = Math.random() < 0.1; // 10% sjanse for pølseblokk
-    const isExtraBall = !isSausageBonus && Math.random() < 0.05; // 5% sjanse
-
-
-    // Start med et tomt objekt
     const brick = {
-  x: c * (brickWidth + 5) + 20,
-  y: r * (brickHeight + 4) + 80,
-  destroyed: false,
-  bonusScore: isSausageBonus,
-  strength: isSausageBonus ? 1 : (isStrong ? 5 : 1),
-  special: !isSausageBonus && !isExtraBall && Math.random() < 0.2,
-  extraBall: isExtraBall,
-  effect: null
-};
+      x: c * (brickWidth + 5) + 20,
+      y: r * (brickHeight + 4) + 80,
+      destroyed: false,
+      bonusScore: isSausageBonus,
+      extraBall: isExtraBall,
+      strength: 1,  // standard – overskrives under
+      special: false,
+      effect: null
+    };
 
-
-    // 🎯 Hvis det er en pølseblokk, sett kun bonusScore
+    // Pølseblokk
     if (isSausageBonus) {
-      brick.bonusScore = true;
       brick.type = "sausage";
+      brick.strength = 1; // alltid svak
     }
-    // 🔴 Ellers: kan være en rød spesialblokk
+    // Ekstra ball-blokk
+    else if (isExtraBall) {
+      brick.type = "extra";
+      brick.strength = 1; // alltid svak
+    }
+    // Spesial (rød)
     else if (Math.random() < 0.2) {
       brick.special = true;
       brick.effect = Math.random() < 0.5 ? "extend" : "shrink";
+      brick.strength = isStrong ? 5 : 1;
       brick.type = "special";
-    } else {
+    }
+    // Vanlig blokk
+    else {
+      brick.strength = isStrong ? 5 : 1;
       brick.type = "normal";
     }
 
     bricks[r][c] = brick;
   }
 }
+
 
 
     document.addEventListener("keydown", e => {
@@ -556,7 +561,7 @@ function detectBallCollision(b) {
   ctx.textAlign = "center";
   ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
 
-  if (elapsed >= 3000) {
+  if (elapsed >= 2000) {
     showPoesklap = false;
 
      // Gjenopprett fart til hovedball
@@ -565,12 +570,13 @@ function detectBallCollision(b) {
 
     // Legg til en ny ball
     extraBalls.push({
-      x: paddle.x + paddle.width / 2,
-      y: paddle.y - 10,
-      dx: 1,
-      dy: -1,
-      radius: 8
-    });
+    x: paddle.x + paddle.width / 2,
+    y: paddle.y - 50,  // 🚀 Start høyere opp så den ikke trigger padel-kollisjon med en gang
+    dx: 1,
+    dy: -1,
+    radius: 8
+});
+
 
     // Sett fart tilbake på hovedballen
     if (!gameStarted) startGame();
@@ -715,31 +721,45 @@ function detectBallCollision(b) {
 
       requestAnimationFrame(draw);
 
-      extraBalls.forEach(b => {
+    extraBalls.forEach(b => {
+  // Flytt ballen
   b.x += b.dx;
   b.y += b.dy;
 
   // Kollisjon med vegger
-  if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
-  if (b.y < b.radius) b.dy *= -1;
+  if (b.x < b.radius || b.x > canvas.width - b.radius) {
+    b.dx *= -1;
+  }
 
-  // Treff padel
+  // Kollisjon med tak
+  if (b.y < b.radius) {
+    b.dy *= -1;
+  }
+
+  // Treff padel (samme logikk som hovedballen)
   if (
-    b.y + b.dy > canvas.height - b.radius - paddle.height - 10 &&
+    b.y + b.dy > paddle.y - b.radius &&
     b.x > paddle.x &&
     b.x < paddle.x + paddle.width
   ) {
-    b.dy = -Math.abs(b.dy);
+    const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+    const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+    const angle = hitPoint * (Math.PI / 3);
+
+    b.dx = speed * Math.sin(angle);
+    b.dy = -Math.abs(speed * Math.cos(angle));
   }
 
-  // Ute av skjerm
-  if (b.y > canvas.height) {
+  // Gått under skjermen → fjern
+  if (b.y - b.radius > canvas.height) {
     b.toRemove = true;
   }
 });
 
-// Fjern baller som har falt ut
+// Fjern baller som er ute av skjermen
 extraBalls = extraBalls.filter(b => !b.toRemove);
+
+
 
     }
   </script>
