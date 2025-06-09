@@ -85,7 +85,7 @@ let paddle = {
   width: canvas.width / 5,
   height: 40,
   x: canvas.width / 2 - canvas.width / 10,
-  y: canvas.height - 100 // 100 px over bunn
+  y: isMobile ? canvas.height - 300 : canvas.height - 100
 };
 let initialSpeed = 1.5; // Startfart for ballen
 
@@ -174,21 +174,31 @@ canvas.addEventListener("touchstart", e => {
     }
 
     function drawPaddle() {
-  if (!drawPaddle.img) {
-    drawPaddle.img = new Image();
-    drawPaddle.img.src = 'https://cdn-icons-png.flaticon.com/512/616/616554.png';
+  const headWidth = paddle.width / 3;
+  const headHeight = paddle.height;
+
+  if (!drawPaddle.img1) {
+    drawPaddle.img1 = new Image();
+    drawPaddle.img1.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat2.png"; // kattehode 1
+    drawPaddle.img2 = new Image();
+    drawPaddle.img2.src = 'https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat2.png'; // kattehode 2 (samme eller annen)
+    drawPaddle.img3 = new Image();
+    drawPaddle.img3.src = 'https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat2.png'; // kattehode 3
   }
 
-  paddle.y = canvas.height - 60;
+  const y = paddle.y;
 
-  if (drawPaddle.img.complete) {
-    ctx.drawImage(drawPaddle.img, paddle.x, paddle.y, paddle.width, paddle.height);
+  if (drawPaddle.img1.complete && drawPaddle.img2.complete && drawPaddle.img3.complete) {
+    ctx.drawImage(drawPaddle.img1, paddle.x, y, headWidth, headHeight);
+    ctx.drawImage(drawPaddle.img2, paddle.x + headWidth, y, headWidth, headHeight);
+    ctx.drawImage(drawPaddle.img3, paddle.x + 2 * headWidth, y, headWidth, headHeight);
   } else {
-    drawPaddle.img.onload = () => {
-      ctx.drawImage(drawPaddle.img, paddle.x, paddle.y, paddle.width, paddle.height);
-    };
+    drawPaddle.img1.onload = draw;
+    drawPaddle.img2.onload = draw;
+    drawPaddle.img3.onload = draw;
   }
 }
+
 
 
 
@@ -393,7 +403,7 @@ canvas.addEventListener("touchstart", e => {
       }
       if (ball.y + ball.dy < ball.radius) {
         ball.dy = -ball.dy;
-      } else if (ball.y + ball.dy > canvas.height - ball.radius - paddle.height - 10) {
+      } else if (ball.y + ball.dy > paddle.y - ball.radius) {
         if (ball.x > paddle.x - 10 && ball.x < paddle.x + paddle.width + 10) {
           let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
           let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
