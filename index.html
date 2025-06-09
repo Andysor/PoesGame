@@ -570,12 +570,14 @@ function detectBallCollision(b) {
 
     // Legg til en ny ball
     extraBalls.push({
-    x: paddle.x + paddle.width / 2,
-    y: paddle.y - 50,  // 🚀 Start høyere opp så den ikke trigger padel-kollisjon med en gang
-    dx: 1,
-    dy: -1,
-    radius: 8
+  x: paddle.x + paddle.width / 2,
+  y: paddle.y - 50,
+  dx: 1,
+  dy: -1,
+  radius: 8,
+  canBounce: false  // 👈 viktig
 });
+
 
 
     // Sett fart tilbake på hovedballen
@@ -722,22 +724,21 @@ function detectBallCollision(b) {
       requestAnimationFrame(draw);
 
     extraBalls.forEach(b => {
-  // Flytt ballen
   b.x += b.dx;
   b.y += b.dy;
 
-  // Kollisjon med vegger
-  if (b.x < b.radius || b.x > canvas.width - b.radius) {
-    b.dx *= -1;
+  // Aktiver bouncing etter første frame
+  if (!b.canBounce) {
+    b.canBounce = true;
   }
 
-  // Kollisjon med tak
-  if (b.y < b.radius) {
-    b.dy *= -1;
-  }
+  // Veggkollisjoner
+  if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
+  if (b.y < b.radius) b.dy *= -1;
 
-  // Treff padel (samme logikk som hovedballen)
+  // Treff padel (hvis aktivert)
   if (
+    b.canBounce &&
     b.y + b.dy > paddle.y - b.radius &&
     b.x > paddle.x &&
     b.x < paddle.x + paddle.width
@@ -750,11 +751,12 @@ function detectBallCollision(b) {
     b.dy = -Math.abs(speed * Math.cos(angle));
   }
 
-  // Gått under skjermen → fjern
+  // Fjern hvis den går under skjermen
   if (b.y - b.radius > canvas.height) {
     b.toRemove = true;
   }
 });
+
 
 // Fjern baller som er ute av skjermen
 extraBalls = extraBalls.filter(b => !b.toRemove);
