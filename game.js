@@ -44,6 +44,7 @@ function startGameWithName() {
 
 }
     const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
+    const PADDLE_TOUCH_OFFSET = 100; // Avstand fra touchpunkt til padelens midtpunkt
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
@@ -325,14 +326,21 @@ function getCanvasX(touch) {
 canvas.addEventListener('touchstart', e => {
   const touch = e.touches[0];
   paddle.x = getCanvasX(touch) - paddle.width / 2;
+  paddle.y = getCanvasY(touch) - PADDLE_TOUCH_OFFSET;
 });
 
 canvas.addEventListener('touchmove', e => {
   const touch = e.touches[0];
   paddle.x = getCanvasX(touch) - paddle.width / 2;
+  paddle.y = getCanvasY(touch) - PADDLE_TOUCH_OFFSET;
   e.preventDefault();
 }, { passive: false });
 
+// Hjelpefunksjon for y-koordinat:
+function getCanvasY(touch) {
+  const rect = canvas.getBoundingClientRect();
+  return (touch.clientY - rect.top) * (canvas.height / rect.height);
+}
     //requestAnimationFrame(draw); // Start rendering loop to show start screen
 
 
@@ -821,49 +829,43 @@ function draw() {
       }
       if (ball.y + ball.dy < ball.radius) {
         ball.dy = -ball.dy;
-      } else if (ball.y + ball.dy > paddle.y - ball.radius) {
-        if (ball.x > paddle.x - 10 && ball.x < paddle.x + paddle.width + 10) {
-          let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-          let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+      } if (ball.y + ball.dy > canvas.height - ball.radius) {
+  lives--;
+  playLifeLossSound();
+  if (lives > 0) {
+    gameStarted = false;
+    ball.dx = 0;
+    ball.dy = 0;
+    resetSpeed();
+  } else {
+    ctx.fillStyle = "red";
+    ctx.font = "40px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    ctx.font = "20px Arial";
+    ctx.fillStyle = "white";
+    ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
+    gameOver = true;
 
-          // Begrens vinkel så ballen ikke går helt horisontalt
-          let angle = hitPoint * (Math.PI / 3); // maks ±60°
+    // Lagre highscore én gang
+    const name = playerName;
+    if (name) {
+      const trimmed = name.substring(0, 10);
+      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
+      loadHighscores();
+    }
 
-          ball.dx = speed * Math.sin(angle);
-          ball.dy = -Math.abs(speed * Math.cos(angle));
-
-        } else {
-          lives--;
-          playLifeLossSound(); // Spill livstap-lyd
-          if (lives > 0) {
-            gameStarted = false;
-            ball.dx = 0;
-            ball.dy = 0;
-            // Reset fart til startfart
-            resetSpeed();
-          }
-          else {
-            ctx.fillStyle = "red";
-            ctx.font = "40px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-            ctx.font = "20px Arial";
-            ctx.fillStyle = "white";
-            ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
-            gameOver = true;
-
-            // Lagre highscore én gang
-            const name = playerName;
-            if (name) {
-              const trimmed = name.substring(0, 10);
-              db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
-              loadHighscores();
-            }
-
-            return;
-          }
-        }
-      }
+    return;
+  }
+} else if (ball.y + ball.dy > paddle.y - ball.radius) {
+  if (ball.x > paddle.x - 10 && ball.x < paddle.x + paddle.width + 10) {
+    let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+    let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+    let angle = hitPoint * (Math.PI / 3); // maks ±60°
+    ball.dx = speed * Math.sin(angle);
+    ball.dy = -Math.abs(speed * Math.cos(angle));
+  }
+}
 
       ball.x += ball.dx;
       ball.y += ball.dy;
