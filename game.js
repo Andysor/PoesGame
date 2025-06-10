@@ -549,6 +549,19 @@ function drawDynamicBackground() {
   fallingTexts.forEach(t => {
     ctx.save();
 
+    // Tegn pølsebonus som bilde
+    if (t.isSausage) {
+      const imgW = 40, imgH = 24;
+      if (sausageImg.complete && sausageImg.naturalWidth > 0) {
+        ctx.drawImage(sausageImg, t.x - imgW / 2, t.y - imgH / 2, imgW, imgH);
+      } else {
+        ctx.fillStyle = "orange";
+        ctx.fillRect(t.x - imgW / 2, t.y - imgH / 2, imgW, imgH);
+      }
+      ctx.restore();
+      return;
+    }
+
     // Tegn hjerte større og i rødt hvis det er ekstra liv
     if (t.isHeart) {
       ctx.font = t.hit ? `${30 + t.frame}px Arial` : "30px Arial";
@@ -583,6 +596,8 @@ function updateFallingTexts() {
   fallingTexts.forEach(t => {
     t.y += t.speed;
 
+
+
     // Kollisjon med padelen
     if (
       t.y >= paddle.y &&
@@ -593,6 +608,14 @@ function updateFallingTexts() {
       //score++;
       t.hit = true;
       t.frame = 0; // start animasjon
+
+    if (t.isSausage) {
+        score += 50;
+    } else if (t.isHeart) {
+        lives++;
+    } else {
+        score++;
+    }
 
       // ❤️ Ekstra liv: hvis det er et hjerte, gi liv
       if (t.isHeart) {
@@ -675,19 +698,17 @@ function detectBallCollision(b) {
         if (brick.strength <= 0) {
           brick.destroyed = true;
 
-          // 🌭 Pølsebonus
-          if (brick.bonusScore) {
+        // 🌭 Pølsebonus
+        if (brick.bonusScore) {
             score += 50;
             fallingTexts.push({
-              text: "50",
-              x: brick.x + brickWidth / 2,
-              y: brick.y,
-              speed: 2,
-              color: "gold",
-              blink: true,
-              hit: false,
-              frame: 0
-            });
+            isSausage: true, // Bruk bilde
+            x: brick.x + brickWidth / 2,
+            y: brick.y,
+            speed: 4, // Dobbelt så fort
+            hit: false,
+            frame: 0
+        });
           } else {
             score += 1;
             // Vis +POES for extend, -POES for shrink, ellers POES
@@ -907,14 +928,18 @@ function draw() {
 
     return;
   }
-} else if (ball.y + ball.dy > paddle.y - ball.radius) {
-  if (ball.x > paddle.x - 10 && ball.x < paddle.x + paddle.width + 10) {
-    let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-    let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-    let angle = hitPoint * (Math.PI / 3); // maks ±60°
-    ball.dx = speed * Math.sin(angle);
-    ball.dy = -Math.abs(speed * Math.cos(angle));
-  }
+} else if (
+  ball.y + ball.dy + ball.radius >= paddle.y && // Ballen treffer eller går under padelens topp
+  ball.y + ball.dy - ball.radius <= paddle.y + paddle.height && // Ballen er ikke under padelens bunn
+  ball.x + ball.radius >= paddle.x && // Ballen treffer padelens venstre kant
+  ball.x - ball.radius <= paddle.x + paddle.width // Ballen treffer padelens høyre kant
+) {
+  // Sprett ballen
+  let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+  let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+  let angle = hitPoint * (Math.PI / 3); // maks ±60°
+  ball.dx = speed * Math.sin(angle);
+  ball.dy = -Math.abs(speed * Math.cos(angle));
 }
 
       ball.x += ball.dx;
