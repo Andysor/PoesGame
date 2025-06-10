@@ -147,14 +147,14 @@ let paddle = {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-let initialSpeed = 1.5; // Startfart for ballen
+let initialSpeed = 2.5; // Startfart for ballen
 
 function resetSpeed() {
   ball.dx = initialSpeed;
   ball.dy = -initialSpeed;
 }
 
-
+const MAX_SPEED = 10; // Maks fart for ballen
 const MAX_SPEED_MULTIPLIER = 3;
 
 let ball = {
@@ -504,6 +504,13 @@ function detectBallCollision(b) {
 
       if (hitX && hitY) {
         b.dy = -b.dy;
+
+        let speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+        if (speed < MAX_SPEED) {
+        let factor = 1.01; // Øk farten med 1% for hvert treff
+        b.dx *= factor;
+        b.dy *= factor;
+        }
 
         // Spill lyd
         if (hitSound && hitSound.readyState >= 2) {
