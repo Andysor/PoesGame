@@ -4,29 +4,51 @@
   <meta charset="UTF-8">
   <title>Poes Gaming Arkanoid</title>
   <style>
-    body {
-      margin: 0;
-      background: #000;
-      color: white;
-      font-family: sans-serif;
-      overflow: hidden;
-    }
-    h1 {
-      text-align: center;
-      color: red;
-      font-size: 48px;
-      margin-top: 20px;
-    }
-    canvas {
-      display: block;
-      margin: 20px auto;
-      border: 2px solid #fff;
-      background: #111;
-    }
-  </style>
+  body {
+    margin: 0;
+    background: #000;
+    color: white;
+    font-family: sans-serif;
+    overflow: hidden;
+  }
+  h1 {
+    text-align: center;
+    color: red;
+    font-size: 48px;
+    margin-top: 20px;
+  }
+  canvas {
+    display: block;
+    margin: 20px auto;
+    border: 2px solid #fff;
+    background: #111;
+  }
+  #character-select {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+    margin: 0 auto 20px auto;
+  }
+  #character-select span {
+    margin-bottom: 10px;
+    font-size: 20px;
+  }
+  #character-select img {
+    margin: 5px;
+  }
+</style>
 </head>
 <body>
-  
+ <div id="character-select" style="text-align:center; margin:20px;">
+      <span>Choose character:</span>
+      <img src="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/springbok.png" class="char-opt" data-img="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/springbok.png" style="width:60px;cursor:pointer;border:2px solid #fff;margin:5px;">
+      <img src="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/south-africa.png" class="char-opt" data-img="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/south-africa.png" style="width:60px;cursor:pointer;border:2px solid #fff;margin:5px;">
+      <img src="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/voortrekker.png" class="char-opt" data-img="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/voortrekker.png" style="width:60px;cursor:pointer;border:2px solid #fff;margin:5px;">
+      <img src="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/rugby-ball.png" class="char-opt" data-img="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/rugby-ball.png" style="width:60px;cursor:pointer;border:2px solid #fff;margin:5px;">
+      <img src="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/braai.png" class="char-opt" data-img="https://raw.githubusercontent.com/Andysor/PoesGame/main/images/braai.png" style="width:60px;cursor:pointer;border:2px solid #fff;margin:5px;">
+      </div> 
   <canvas id="arkanoid" width="600" height="400"></canvas>
 <!-- Firebase SDK-er -->
 <script src="https://www.gstatic.com/firebasejs/11.9.0/firebase-app-compat.js"></script>
@@ -56,11 +78,21 @@
 
     highscoreList = snapshot.docs.map(doc => doc.data());
   
-    requestAnimationFrame(draw); // Start rendering loop to show highscores
+    //requestAnimationFrame(draw); // Start rendering loop to show highscores
   }
 </script>
   <script>
     
+    let selectedCharacter = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+document.querySelectorAll('.char-opt').forEach(img => {
+  img.addEventListener('click', function() {
+    selectedCharacter = this.dataset.img;
+    document.querySelectorAll('.char-opt').forEach(i => i.style.border = "2px solid #fff");
+    this.style.border = "4px solid gold";
+    startGame(); // Start spillet automatisk ved valg!
+  });
+});
+
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
@@ -219,7 +251,7 @@ canvas.addEventListener('touchmove', e => {
   e.preventDefault();
 }, { passive: false });
 
-    requestAnimationFrame(draw); // Start rendering loop to show start screen
+    //requestAnimationFrame(draw); // Start rendering loop to show start screen
 
 for (let r = 0; r < rows; r++) {
   bricks[r] = [];
@@ -315,13 +347,11 @@ canvas.addEventListener("touchstart", e => {
   const headHeight = paddle.height;
   const y = paddle.y;
 
-  // Sørg for at vi har kattebilder for hvert hode
   for (let i = 0; i < paddleHeads; i++) {
-    if (!drawPaddle[`img${i}`]) {
+    if (!drawPaddle[`img${i}`] || drawPaddle[`img${i}`].src !== selectedCharacter) {
       drawPaddle[`img${i}`] = new Image();
-      drawPaddle[`img${i}`].src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+      drawPaddle[`img${i}`].src = selectedCharacter;
     }
-
     const img = drawPaddle[`img${i}`];
     if (img.complete) {
       ctx.drawImage(img, paddle.x + i * headWidth, y, headWidth, headHeight);
@@ -636,13 +666,14 @@ function detectBallCollision(b) {
     }
 
     function startGame() {
-      if (!gameStarted) {
-        ball.dx = initialSpeed;
-        ball.dy = -initialSpeed;
-        gameStarted = true;
-        requestAnimationFrame(draw);
-      }
-    }
+  if (!gameStarted) {
+    document.getElementById('character-select').style.display = "none";
+    ball.dx = initialSpeed;
+    ball.dy = -initialSpeed;
+    gameStarted = true;
+    requestAnimationFrame(draw);
+  }
+}
 
     function draw() {
       
@@ -736,7 +767,7 @@ function detectBallCollision(b) {
         ctx.fillStyle = "white";
         ctx.font = "20px Arial";
         ctx.textAlign = "center";
-        ctx.fillText("Press SPACE to start", canvas.width / 2, canvas.height / 2);
+        //ctx.fillText("Press SPACE to start", canvas.width / 2, canvas.height / 2);
       }
 
       updateFallingTexts();
