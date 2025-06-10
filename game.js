@@ -50,9 +50,9 @@ function startGameWithName() {
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     //const hitSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3"); // Lyd for treff
-    hitSound.volume = 0.5; // Juster volumet for trefflyd
-    hitSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
-    hitSound.loop = false; // Ikke looper, bare spiller én gang per treff
+    //hitSound.volume = 0.5; // Juster volumet for trefflyd
+    //hitSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
+    //hitSound.loop = false; // Ikke looper, bare spiller én gang per treff
     let lifeLossSound = new Audio('https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3');  // Lyd for livstap
 
     lifeLossSound.volume = 0.3; // Juster volumet for livstap-lyd
@@ -513,10 +513,10 @@ function detectBallCollision(b) {
         }
 
         // Spill lyd
-        if (hitSound && hitSound.readyState >= 2) {
-        hitSound.currentTime = 0;
-        hitSound.play().catch(() => {});
-}
+        //if (hitSound && hitSound.readyState >= 2) {
+        //hitSound.currentTime = 0;
+        //hitSound.play().catch(() => {});
+//}
 
         // Poesklap pause kun for hovedball
         if (brick.extraBall && b === ball) {
