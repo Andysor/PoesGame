@@ -40,7 +40,7 @@ function startGameWithName() {
   currentLevel = 1;           // Start på level 1
   loadLevel(currentLevel);    // <-- LAST INN LEVEL 1 FRA FIL
 }
-    const PADDLE_BOTTOM_MARGIN = 150; // Avstand fra bunnen av skjermen til padelen
+    const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
