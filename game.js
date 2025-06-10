@@ -37,15 +37,18 @@ function startGameWithName() {
   document.getElementById('name-input-container').style.display = "none";
   readyToStart = true;
   gameStarted = false;
-  currentLevel = 1;           // Start på level 1
-  loadLevel(currentLevel);    // <-- LAST INN LEVEL 1 FRA FIL
+  currentLevel = 1;
+  loadLevel(currentLevel); // <-- LAST INN LEVEL 1 FRA FIL
+  // Ikke sett gameStarted = true her!
+  // Ikke start ballen her!
+
 }
     const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
     let pausedBallVelocity = { dx: 0, dy: 0 };
-
+    let levelLoaded = false;
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     
@@ -186,8 +189,9 @@ function loadLevel(levelNum) {
   }
 }
   maxLevelReached = false;
-  resetLevelState();
-  draw();
+    resetLevelState();
+    levelLoaded = true;
+    requestAnimationFrame(draw); // Start draw-loopen
 })
     .catch(() => {
       maxLevelReached = true;
@@ -238,8 +242,8 @@ ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 // Tilbakestill variabler for nytt level
 function resetLevelState() {
-  score = 0;
-  lives = 3;
+  //score = 0;
+  //lives = 3;
   gameStarted = false;
   gameOver = false;
   extraBalls = [];
@@ -341,7 +345,7 @@ canvas.addEventListener('touchmove', e => {
         document.location.reload();
       }
       if (e.code === "Space" && !gameStarted) 
-      if (readyToStart && !gameStarted && (e.code === "Space" || e.key === " ")) {
+      if (readyToStart && levelLoaded && !gameStarted && (e.code === "Space" || e.key === " ")) {
   gameStarted = true;
   ball.dx = initialSpeed;
   ball.dy = -initialSpeed;
@@ -359,7 +363,7 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener("touchstart", e => {
   if (gameOver) {
     document.location.reload();
-  } else if (readyToStart && !gameStarted) {
+  } else if (readyToStart && levelLoaded && !gameStarted) {
     gameStarted = true;
     ball.dx = initialSpeed;
     ball.dy = -initialSpeed;
@@ -423,10 +427,11 @@ function interpolateColor(c1, c2, t) {
 
 
 function drawBricks() {
-  if (!brickWidth || brickWidth === 0) return;
-  const shineOffset = (Date.now() / 15) % brickWidth;
+    if (!bricks || !bricks.length || !bricks[0] || !bricks[0].length) return;
+    if (!brickWidth || brickWidth === 0) return;
+    const shineOffset = (Date.now() / 15) % brickWidth;
 
-  for (let r = 0; r < rows; r++) {
+    for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const b = bricks[r][c];
       if (b.destroyed) continue;
@@ -607,14 +612,11 @@ function detectBallCollision(b) {
 
         // Poesklap pause kun for hovedball
         if (brick.extraBall && b === ball) {
-          showPoesklap = true;
-          poesklapTimer = Date.now();
-          pausedBallVelocity.dx = b.dx;
-          pausedBallVelocity.dy = b.dy;
-          b.dx = 0;
-          b.dy = 0;
-          playPoesklapSound();
-        }
+  showPoesklap = true;
+  poesklapTimer = Date.now();
+  playPoesklapSound();
+  // Ikke pause ballen!
+}
 
         // Reduser styrke
         brick.strength--;
@@ -715,7 +717,7 @@ function detectBallCollision(b) {
 
     }
 
-    function startGame() {
+function startGame() {
   if (!gameStarted) {
     document.getElementById('character-select').style.display = "none";
     ball.dx = initialSpeed;
@@ -725,40 +727,30 @@ function detectBallCollision(b) {
   }
 }
 
-    function draw() {
-      
-      if (showPoesklap) {
-  const elapsed = Date.now() - poesklapTimer;
-  ctx.fillStyle = elapsed % 500 < 250 ? "yellow" : "orange";
-  ctx.font = "bold 60px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawDynamicBackground(); 
+
+    if (showPoesklap) {
+        const elapsed = Date.now() - poesklapTimer;
+        ctx.fillStyle = elapsed % 500 < 250 ? "yellow" : "orange";
+        ctx.font = "bold 60px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
 
   if (elapsed >= 2000) {
     showPoesklap = false;
-
-     // Gjenopprett fart til hovedball
-  ball.dx = pausedBallVelocity.dx;
-  ball.dy = pausedBallVelocity.dy;
-
     // Legg til en ny ball
     extraBalls.push({
-  x: paddle.x + paddle.width / 2,
-  y: paddle.y - 50,
-  dx: 1,
-  dy: -1,
-  radius: 8,
-  canBounce: false  // 👈 viktig
-});
-
-
-
-    // Sett fart tilbake på hovedballen
-    if (!gameStarted) startGame();
+      x: paddle.x + paddle.width / 2,
+      y: paddle.y - 50,
+      dx: 1,
+      dy: -1,
+      radius: 8,
+      canBounce: false
+    });
   }
-
-  requestAnimationFrame(draw);
-  return;
+  // Ikke return! La resten av draw() kjøre videre.
 }
 
       
@@ -805,36 +797,24 @@ function detectBallCollision(b) {
   ctx.textAlign = "center";
   ctx.fillText("Raak die fokken skerm", canvas.width / 2, canvas.height / 2);
 }
+// Tegn alltid disse, uansett gameStarted:
+  drawBricks();
+  drawPaddle();
+  drawBall();
+  drawScore();
+  drawFallingTexts();
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawDynamicBackground(); // <-- LEGG TIL DENNE LINJEN HER
-      ctx.fillStyle = "red";
-      ctx.font = "bold 32px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("Poes Gaming", canvas.width / 2, 40);
-      drawFallingTexts();
-      drawBall();
-      drawPaddle();
-      drawBricks();
-      drawScore();
-
-      if (!gameStarted) {
-        ctx.fillStyle = "white";
-        ctx.font = "20px Arial";
-        ctx.textAlign = "center";
-        //ctx.fillText("Press SPACE to start", canvas.width / 2, canvas.height / 2);
-      }
-
+  if (gameStarted) {
       updateFallingTexts();
       collisionDetection();
-
-      if (bricks.flat().every(brick => brick.destroyed)) {
+  }
+    if (bricks.flat().every(brick => brick.destroyed)) {
   setTimeout(() => {
     currentLevel++;
     loadLevel(currentLevel);
   }, 2000); // 2 sek pause før neste level
   return;
-}
+    }
 
       if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
         ball.dx = -ball.dx;
