@@ -35,11 +35,10 @@ function startGameWithName() {
     return;
   }
   document.getElementById('name-input-container').style.display = "none";
-  // Kall resizeCanvas etter at navneinput er skjult:
-  //resizeCanvas();
   readyToStart = true;
   gameStarted = false;
-  requestAnimationFrame(draw); // Tegn brettet, men ikke start ballen
+  currentLevel = 1;           // Start på level 1
+  loadLevel(currentLevel);    // <-- LAST INN LEVEL 1 FRA FIL
 }
     const PADDLE_BOTTOM_MARGIN = 150; // Avstand fra bunnen av skjermen til padelen
     let extraBalls = [];
@@ -60,7 +59,7 @@ function startGameWithName() {
     poesklapSound.preload = "auto";
 
     
-const hitSoundPool = Array.from({length: 5}, () => {
+const hitSoundPool = Array.from({length: 20}, () => {
   const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3");
   a.volume = 0.5;
   return a;
@@ -109,6 +108,8 @@ function playPoesklapSound() {
     const canvas = document.getElementById('arkanoid');
     const ctx = canvas.getContext('2d');
 
+
+    
 function resizeCanvas() {
   // Velg ønsket aspect ratio for mobil og PC
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -141,7 +142,109 @@ function resizeCanvas() {
   paddle.x = canvas.width / 2 - paddle.width / 2;
 }
 
+//Level load
 
+let currentLevel = 1;
+let maxLevelReached = false;
+
+// Kall denne for å laste et level
+function loadLevel(levelNum) {
+  fetch(`levels/Level${levelNum}.json`)
+    .then(res => {
+      if (!res.ok) throw new Error("No more levels");
+      return res.json();
+    })
+    .then(level => {
+  rows = level.length;
+  cols = level[0].length;
+
+  // Oppdater brickWidth og brickHeight hvis du vil at alt skal få plass:
+  // brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
+  // brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
+    brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
+    brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
+
+
+  bricks = [];
+  for (let r = 0; r < rows; r++) {
+    bricks[r] = [];
+    for (let c = 0; c < cols; c++) {
+      bricks[r][c] = {
+  type: level[r][c].type || "normal",
+  destroyed: !!level[r][c].destroyed,
+  strength: level[r][c].strength !== undefined
+    ? level[r][c].strength
+    : (level[r][c].type === "special" ? 3 : 1),
+  bonusScore: !!level[r][c].bonusScore,
+  extraBall: !!level[r][c].extraBall,
+  special: !!level[r][c].special,
+  effect: level[r][c].effect || null,
+  x: c * (brickWidth + 5) + 20,
+  y: r * (brickHeight + 4) + 80
+};
+    }
+  }
+  maxLevelReached = false;
+  resetLevelState();
+  draw();
+})
+    .catch(() => {
+      maxLevelReached = true;
+      gameOver = true;
+      // Vis "Du har rundet spillet!" eller lignende
+
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = "40px Arial";
+  ctx.fillStyle = "red";
+  ctx.textAlign = "center";
+  ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
+
+
+
+  // 👇 Vis highscore-listen hvis tilgjengelig
+  if (highscoreList.length > 0) {
+    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
+    let lineHeight = fontSize * 1.4;
+
+    ctx.font = `${fontSize}px Arial`;
+    ctx.fillStyle = "white";
+    ctx.textAlign = "left";
+    ctx.fillText("Topp 10 Highscores:", 50, 170);
+
+    highscoreList.forEach((entry, i) => {
+      const y = 170 + lineHeight * (i + 1);
+      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
+    });
+  } else {
+    loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
+  }
+
+  // Lagre highscore én gang
+  if (!gameOver) {
+    const name = playerName;
+    if (name) {
+      const trimmed = name.substring(0, 10);
+      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
+      loadHighscores();
+    }
+  }
+
+  gameOver = true;
+  requestAnimationFrame(draw); // Fortsett å tegne så highscore vises når listen er klar
+  return;
+    });
+}
+
+// Tilbakestill variabler for nytt level
+function resetLevelState() {
+  score = 0;
+  lives = 3;
+  gameStarted = false;
+  gameOver = false;
+  extraBalls = [];
+  fallingTexts = [];
+  // evt. annet du vil nullstille
+}
 
 function lightenColor(hex, factor) {
   if (!hex.startsWith("#") || hex.length !== 7) return hex; // fallback
@@ -194,8 +297,8 @@ let ball = {
     let bricks = [];
     let rows = 10; // Antall rader med murstein
     let cols = 12; // Antall kolonner med murstein
-    let brickWidth = (canvas.width - 40) / cols - 5; // 5 px mellomrom
-    let brickHeight = (canvas.height / 3) / rows - 4; // tynnere og høyere dekning
+    let brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
+    let brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
 
     let score = 0;
     let lives = 3;
@@ -538,7 +641,10 @@ function detectBallCollision(b) {
         }
 
         // Spill lyd
+        if (!brick.lastHitTime || Date.now() - brick.lastHitTime > 50) {
         playHitSound();
+        brick.lastHitTime = Date.now();
+}
 
 
         // Poesklap pause kun for hovedball
@@ -765,46 +871,10 @@ function detectBallCollision(b) {
       collisionDetection();
 
       if (bricks.flat().every(brick => brick.destroyed)) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = "40px Arial";
-  ctx.fillStyle = "red";
-  ctx.textAlign = "center";
-  ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
-
-  ctx.font = "20px Arial";
-  ctx.fillStyle = "white";
-  ctx.fillText("Du vant!", canvas.width / 2, 120);
-
-  // 👇 Vis highscore-listen hvis tilgjengelig
-  if (highscoreList.length > 0) {
-    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-    let lineHeight = fontSize * 1.4;
-
-    ctx.font = `${fontSize}px Arial`;
-    ctx.fillStyle = "white";
-    ctx.textAlign = "left";
-    ctx.fillText("Topp 10 Highscores:", 50, 170);
-
-    highscoreList.forEach((entry, i) => {
-      const y = 170 + lineHeight * (i + 1);
-      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
-    });
-  } else {
-    loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
-  }
-
-  // Lagre highscore én gang
-  if (!gameOver) {
-    const name = playerName;
-    if (name) {
-      const trimmed = name.substring(0, 10);
-      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
-      loadHighscores();
-    }
-  }
-
-  gameOver = true;
-  requestAnimationFrame(draw); // Fortsett å tegne så highscore vises når listen er klar
+  setTimeout(() => {
+    currentLevel++;
+    loadLevel(currentLevel);
+  }, 2000); // 2 sek pause før neste level
   return;
 }
 
