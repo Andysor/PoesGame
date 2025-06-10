@@ -68,10 +68,31 @@
 
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const hitSound = new Audio("https://freesound.org/data/previews/341/341695_5260877-lq.mp3");
+    const hitSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3"); // Lyd for treff
     hitSound.volume = 0.5; // Juster volumet for trefflyd
     hitSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
     hitSound.loop = false; // Ikke looper, bare spiller én gang per treff
+    let lifeLossSound = new Audio('https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3');  // Lyd for livstap
+
+    lifeLossSound.volume = 0.5; // Juster volumet for livstap-lyd
+    lifeLossSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
+
+    const poesklapSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3");
+    poesklapSound.volume = 0.7;
+    poesklapSound.preload = "auto";
+
+    document.addEventListener('keydown', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('mousedown', unlockAudio, { once: true });
+
+function unlockAudio() {
+  hitSound.play().catch(() => {});
+  lifeLossSound.play().catch(() => {});
+  hitSound.pause();
+  hitSound.currentTime = 0;
+  lifeLossSound.pause();
+  lifeLossSound.currentTime = 0;
+}
 
     const sausageImg = new Image();
     sausageImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/sausage.png";
@@ -149,12 +170,14 @@ let ball = {
     let score = 0;
     let lives = 3;
     let catImg = new Image();
-    let lifeLossSound = new Audio('https://www.soundjay.com/button/beep-07.mp3');  // Lyd for livstap
+
 
     catImg.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png'; // Hundelignende bilde erstattes
     let gameStarted = false;
     let gameOver = false;
     let fallingTexts = [];
+
+
 
    // 📱 Mobilvennlig touchkontroll
 canvas.addEventListener('touchstart', e => {
@@ -355,7 +378,19 @@ function interpolateColor(c1, c2, t) {
   }
 }
 
+function drawDynamicBackground() {
+  // Lys gradient som endrer seg over tid
+  const t = Date.now() * 0.0003;
+  const color1 = `hsl(${(t * 60) % 360}, 80%, 35%)`;
+  const color2 = `hsl(${(t * 60 + 60) % 360}, 80%, 55%)`;
 
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  grad.addColorStop(0, color1);
+  grad.addColorStop(1, color2);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
 
 
 
@@ -457,10 +492,10 @@ function detectBallCollision(b) {
         b.dy = -b.dy;
 
         // Spill lyd
-        if (hitSound) {
-          hitSound.currentTime = 0;
-          hitSound.play();
-        }
+        if (hitSound && hitSound.readyState >= 2) {
+        hitSound.currentTime = 0;
+        hitSound.play().catch(() => {});
+}
 
         // Poesklap pause kun for hovedball
         if (brick.extraBall && b === ball) {
@@ -470,6 +505,8 @@ function detectBallCollision(b) {
           pausedBallVelocity.dy = b.dy;
           b.dx = 0;
           b.dy = 0;
+          poesklapSound.currentTime = 0;
+          poesklapSound.play().catch(() => {});
         }
 
         // Reduser styrke
@@ -591,7 +628,7 @@ function detectBallCollision(b) {
       
       if (gameOver) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+  //drawDynamicBackground(); // Tegn bakgrunn      
   ctx.fillStyle = "red";
   ctx.font = "40px Arial";
   ctx.textAlign = "center";
@@ -629,6 +666,7 @@ function detectBallCollision(b) {
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawDynamicBackground(); // <-- LEGG TIL DENNE LINJEN HER
       ctx.fillStyle = "red";
       ctx.font = "bold 32px Arial";
       ctx.textAlign = "center";
