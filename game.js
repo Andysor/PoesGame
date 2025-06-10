@@ -1,9 +1,10 @@
+// Legg til øverst i filen:
+let loadingNextLevel = false;
+let readyToStart = false;
+let selectedCharacter = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+let playerName = "";
 
-    let readyToStart = false;
-    let selectedCharacter = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
-    let playerName = "";
-
-    let characterChosen = false;
+let characterChosen = false;
 document.querySelectorAll('.char-opt').forEach(img => {
   img.addEventListener('click', function() {
     if (characterChosen) return;
@@ -98,6 +99,25 @@ const poesklapSoundPool = Array.from({length: 3}, () => {
 });
 let poesklapSoundIndex = 0;
 
+function unlockAudio() {
+  try {
+    // Spill av og pause alle lyder for å "låse opp" dem
+    lifeLossSoundPool.forEach(a =>
+      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
+    );
+    poesklapSoundPool.forEach(a =>
+      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
+    );
+    hitSoundPool.forEach(a =>
+      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
+    );
+  } catch(e) {}
+  window.removeEventListener('touchstart', unlockAudio);
+  window.removeEventListener('mousedown', unlockAudio);
+}
+window.addEventListener('touchstart', unlockAudio, { once: true });
+window.addEventListener('mousedown', unlockAudio, { once: true });
+
 function playPoesklapSound() {
   const sound = poesklapSoundPool[poesklapSoundIndex];
   sound.currentTime = 0;
@@ -153,7 +173,7 @@ let maxLevelReached = false;
 
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
-  fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
+  return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) throw new Error("No more levels");
       return res.json();
@@ -304,7 +324,7 @@ function resetSpeed() {
   ball.dy = -initialSpeed;
 }
 
-const MAX_SPEED = 10; // Maks fart for ballen
+const MAX_SPEED = 12; // Maks fart for ballen
 const MAX_SPEED_MULTIPLIER = 3;
 
 let ball = {
@@ -680,7 +700,7 @@ function detectBallCollision(b) {
 
         let speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
         if (speed < MAX_SPEED) {
-          let factor = 1.01; // Øk farten med 1% for hvert treff
+          let factor = 1.02; // Øk farten med 1% for hvert treff
           b.dx *= factor;
           b.dy *= factor;
         }
@@ -691,6 +711,18 @@ function detectBallCollision(b) {
           poesklapTimer = Date.now();
           playPoesklapSound();
           // Ikke pause ballen!
+        
+          // Legg til ekstraball fra denne blokkens posisjon
+            const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+            const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
+            extraBalls.push({
+                x: brick.x + brickWidth / 2,
+                y: brick.y + brickHeight / 2,
+                dx: mainSpeed * Math.cos(angle),
+                dy: -Math.abs(mainSpeed * Math.sin(angle)),
+                radius: 8,
+                canBounce: false
+            });
         }
 
         // Reduser styrke
@@ -814,15 +846,10 @@ function draw() {
 
   if (elapsed >= 2000) {
     showPoesklap = false;
-    // Legg til en ny ball
-    extraBalls.push({
-      x: paddle.x + paddle.width / 2,
-      y: paddle.y - 50,
-      dx: 1,
-      dy: -1,
-      radius: 8,
-      canBounce: false
-    });
+    // Når du legger til en ny ekstraball:
+const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
+
   }
   // Ikke return! La resten av draw() kjøre videre.
 }
@@ -882,13 +909,16 @@ function draw() {
       updateFallingTexts();
       collisionDetection();
   }
-    if (bricks.flat().every(brick => brick.destroyed)) {
+    if (!loadingNextLevel && bricks.flat().every(brick => brick.destroyed)) {
+  loadingNextLevel = true;
   setTimeout(() => {
     currentLevel++;
-    loadLevel(currentLevel);
-  }, 2000); // 2 sek pause før neste level
+    loadLevel(currentLevel).then(() => {
+      loadingNextLevel = false;
+    });
+  }, 2000);
   return;
-    }
+}
 
       if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
         ball.dx = -ball.dx;
@@ -965,18 +995,19 @@ function draw() {
 
   // Treff padel (hvis aktivert)
   if (
-    b.canBounce &&
-    b.y + b.dy > paddle.y - b.radius &&
-    b.x > paddle.x &&
-    b.x < paddle.x + paddle.width
-  ) {
-    const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-    const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
-    const angle = hitPoint * (Math.PI / 3);
+  b.canBounce &&
+  b.y + b.dy + b.radius >= paddle.y &&
+  b.y + b.dy - b.radius <= paddle.y + paddle.height &&
+  b.x + b.radius >= paddle.x &&
+  b.x - b.radius <= paddle.x + paddle.width
+) {
+  const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+  const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+  const angle = hitPoint * (Math.PI / 3);
 
-    b.dx = speed * Math.sin(angle);
-    b.dy = -Math.abs(speed * Math.cos(angle));
-  }
+  b.dx = speed * Math.sin(angle);
+  b.dy = -Math.abs(speed * Math.cos(angle));
+}
 
   // Fjern hvis den går under skjermen
   if (b.y - b.radius > canvas.height) {
