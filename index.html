@@ -88,10 +88,13 @@
 function unlockAudio() {
   hitSound.play().catch(() => {});
   lifeLossSound.play().catch(() => {});
+  poesklapSound.play().catch(() => {});
   hitSound.pause();
   hitSound.currentTime = 0;
   lifeLossSound.pause();
   lifeLossSound.currentTime = 0;
+  poesklapSound.pause();
+  poesklapSound.currentTime = 0;
 }
 
     const sausageImg = new Image();
