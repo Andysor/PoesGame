@@ -41,7 +41,7 @@ function startGameWithName() {
   gameStarted = false;
   requestAnimationFrame(draw); // Tegn brettet, men ikke start ballen
 }
-
+    const PADDLE_BOTTOM_MARGIN = 150; // Avstand fra bunnen av skjermen til padelen
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
@@ -49,7 +49,7 @@ function startGameWithName() {
 
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const hitSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3"); // Lyd for treff
+    //const hitSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3"); // Lyd for treff
     hitSound.volume = 0.5; // Juster volumet for trefflyd
     hitSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
     hitSound.loop = false; // Ikke looper, bare spiller én gang per treff
@@ -67,11 +67,11 @@ function startGameWithName() {
     document.addEventListener('mousedown', unlockAudio, { once: true });
 
 function unlockAudio() {
-  hitSound.play().catch(() => {});
+  //hitSound.play().catch(() => {});
   lifeLossSound.play().catch(() => {});
   poesklapSound.play().catch(() => {});
-  hitSound.pause();
-  hitSound.currentTime = 0;
+  //hitSound.pause();
+  //hitSound.currentTime = 0;
   lifeLossSound.pause();
   lifeLossSound.currentTime = 0;
   poesklapSound.pause();
@@ -112,7 +112,7 @@ function resizeCanvas() {
   canvas.style.marginTop = canvas.style.marginBottom = "auto";
 
   // Oppdater padelens y-posisjon etter resize
-  paddle.y = canvas.height - 160;
+  paddle.y = canvas.height - PADDLE_BOTTOM_MARGIN; // Fra variabel
   paddle.x = canvas.width / 2 - paddle.width / 2;
 }
 
@@ -141,7 +141,7 @@ let paddle = {
   width: paddleHeads * headUnit,
   height: 40,
   x: canvas.width / 2 - (paddleHeads * headUnit) / 2,
-  y: canvas.height - 80 // Alltid 80px fra bunnen
+  y: canvas.height - PADDLE_BOTTOM_MARGIN // Fra variabel
 };
 
 window.addEventListener('resize', resizeCanvas);
