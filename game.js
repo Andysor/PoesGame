@@ -14,19 +14,11 @@ document.querySelectorAll('.char-opt').forEach(img => {
     document.getElementById('character-select').style.display = "none";
     document.getElementById('name-input-container').style.display = "block";
     document.getElementById('player-name').focus();
+    resizeCanvas();
   });
 });
 
-document.querySelectorAll('.char-opt').forEach(img => {
-  img.addEventListener('click', function() {
-    selectedCharacter = this.dataset.img;
-    document.querySelectorAll('.char-opt').forEach(i => i.style.border = "2px solid #fff");
-    this.style.border = "4px solid gold";
-    document.getElementById('character-select').style.display = "none";
-    document.getElementById('name-input-container').style.display = "block";
-    document.getElementById('player-name').focus();
-  });
-});
+
 
 // Start spill når bruker trykker på knappen eller Enter
 document.getElementById('start-btn').onclick = startGameWithName;
@@ -43,6 +35,8 @@ function startGameWithName() {
     return;
   }
   document.getElementById('name-input-container').style.display = "none";
+  // Kall resizeCanvas etter at navneinput er skjult:
+  resizeCanvas();
   readyToStart = true;
   gameStarted = false;
   requestAnimationFrame(draw); // Tegn brettet, men ikke start ballen
