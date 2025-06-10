@@ -14,7 +14,7 @@ document.querySelectorAll('.char-opt').forEach(img => {
     document.getElementById('character-select').style.display = "none";
     document.getElementById('name-input-container').style.display = "block";
     document.getElementById('player-name').focus();
-    resizeCanvas();
+    //resizeCanvas();
   });
 });
 
@@ -36,7 +36,7 @@ function startGameWithName() {
   }
   document.getElementById('name-input-container').style.display = "none";
   // Kall resizeCanvas etter at navneinput er skjult:
-  resizeCanvas();
+  //resizeCanvas();
   readyToStart = true;
   gameStarted = false;
   requestAnimationFrame(draw); // Tegn brettet, men ikke start ballen

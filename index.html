@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Poes Gaming Arkanoid</title>
   <style>
   body {
@@ -11,32 +12,32 @@
     font-family: sans-serif;
     overflow: hidden;
   }
-  h1 {
-    text-align: center;
-    color: red;
-    font-size: 48px;
-    margin-top: 20px;
-  }
-  canvas {
-    display: block;
-    margin: 20px auto;
-    border: 2px solid #fff;
-    background: #111;
-  }
-  #character-select {
+  #character-select,
+  #name-input-container {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 40vh;
-    margin: 0 auto 20px auto;
+    background: rgba(0,0,0,0.85);
+    z-index: 10;
   }
-  #character-select span {
+  #character-select span,
+  #name-input-container span {
     margin-bottom: 10px;
     font-size: 20px;
   }
   #character-select img {
     margin: 5px;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    border: 2px solid #fff;
+    background: #111;
+    position: relative;
+    z-index: 1;
   }
 </style>
 </head>
