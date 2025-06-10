@@ -149,7 +149,7 @@ let maxLevelReached = false;
 
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
-  fetch("https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/Level${levelNum}.json")
+  fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) throw new Error("No more levels");
       return res.json();
