@@ -149,7 +149,7 @@ let maxLevelReached = false;
 
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
-  fetch(`levels/Level${levelNum}.json`)
+  fetch("https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/Level${levelNum}.json")
     .then(res => {
       if (!res.ok) throw new Error("No more levels");
       return res.json();
@@ -330,51 +330,8 @@ canvas.addEventListener('touchmove', e => {
 
     //requestAnimationFrame(draw); // Start rendering loop to show start screen
 
-for (let r = 0; r < rows; r++) {
-  bricks[r] = [];
-  for (let c = 0; c < cols; c++) {
-    const isStrong = r < rows - 1 && (rows - r - 2) % 2 === 0;
 
-    const isSausageBonus = Math.random() < 0.1;
-    const isExtraBall = Math.random() < 0.05;
 
-    const brick = {
-      x: c * (brickWidth + 5) + 20,
-      y: r * (brickHeight + 4) + 80,
-      destroyed: false,
-      bonusScore: isSausageBonus,
-      extraBall: isExtraBall,
-      strength: 1,  // standard – overskrives under
-      special: false,
-      effect: null
-    };
-
-    // Pølseblokk
-    if (isSausageBonus) {
-      brick.type = "sausage";
-      brick.strength = 1; // alltid svak
-    }
-    // Ekstra ball-blokk
-    else if (isExtraBall) {
-      brick.type = "extra";
-      brick.strength = 1; // alltid svak
-    }
-    // Spesial (rød)
-    else if (Math.random() < 0.2) {
-      brick.special = true;
-      brick.effect = Math.random() < 0.5 ? "extend" : "shrink";
-      brick.strength = isStrong ? 3 : 1;
-      brick.type = "special";
-    }
-    // Vanlig blokk
-    else {
-      brick.strength = isStrong ? 3 : 1;
-      brick.type = "normal";
-    }
-
-    bricks[r][c] = brick;
-  }
-}
 
 
 
