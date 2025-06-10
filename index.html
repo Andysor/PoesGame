@@ -102,20 +102,40 @@ function unlockAudio() {
 
     const canvas = document.getElementById('arkanoid');
     const ctx = canvas.getContext('2d');
-if (isMobile) {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  let paddle = { width: canvas.width / 6, height: 10, x: canvas.width / 2 - canvas.width / 12 };
-}
+
 function resizeCanvas() {
-  if (/Mobi|Android/i.test(navigator.userAgent)) {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  } else {
-    canvas.width = 600;
-    canvas.height = 400;
-  }
+  // Velg ønsket aspect ratio for mobil og PC
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+  const aspect = isMobile ? 2 / 3 : 4 / 3; // 720x1280 for mobil, 800x600 for PC
+  const baseW = isMobile ? 720 : 800;
+  const baseH = isMobile ? 1280 : 600;
+
+  // Finn vinduets størrelse
+  let winW = window.innerWidth;
+  let winH = window.innerHeight;
+
+  // Finn riktig visningsstørrelse for canvas (uten å strekke)
+  let scale = Math.min(winW / baseW, winH / baseH);
+
+  // Sett intern oppløsning (for skarphet)
+  canvas.width = baseW;
+  canvas.height = baseH;
+
+  // Sett visningsstørrelse med CSS
+  canvas.style.width = (baseW * scale) + "px";
+  canvas.style.height = (baseH * scale) + "px";
+
+  // Sentrer canvas horisontalt/vertikalt hvis det er plass til overs
+  canvas.style.display = "block";
+  canvas.style.marginLeft = canvas.style.marginRight = "auto";
+  canvas.style.marginTop = canvas.style.marginBottom = "auto";
+
+  // Oppdater padelens y-posisjon etter resize
+  paddle.y = canvas.height - 160;
+  paddle.x = canvas.width / 2 - paddle.width / 2;
 }
+
+
 
 function lightenColor(hex, factor) {
   if (!hex.startsWith("#") || hex.length !== 7) return hex; // fallback
@@ -130,9 +150,7 @@ function lightenColor(hex, factor) {
 
   return `rgb(${r},${g},${b})`;
 }
-
-
-resizeCanvas();    
+ 
 
 let paddleHeads = 3; // starter med 3
 const maxPaddleHeads = 6;
@@ -142,8 +160,11 @@ let paddle = {
   width: paddleHeads * headUnit,
   height: 40,
   x: canvas.width / 2 - (paddleHeads * headUnit) / 2,
-  y: isMobile ? canvas.height - 500 : canvas.height - 100
+  y: canvas.height - 80 // Alltid 80px fra bunnen
 };
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
 let initialSpeed = 1.5; // Startfart for ballen
 
@@ -181,19 +202,22 @@ let ball = {
     let fallingTexts = [];
 
 
+function getCanvasX(touch) {
+  const rect = canvas.getBoundingClientRect();
+  // Skaler til intern canvas-koordinat
+  return (touch.clientX - rect.left) * (canvas.width / rect.width);
+}
 
-   // 📱 Mobilvennlig touchkontroll
 canvas.addEventListener('touchstart', e => {
   const touch = e.touches[0];
-  paddle.x = touch.clientX - canvas.getBoundingClientRect().left - paddle.width / 2;
+  paddle.x = getCanvasX(touch) - paddle.width / 2;
 });
 
 canvas.addEventListener('touchmove', e => {
   const touch = e.touches[0];
-  paddle.x = touch.clientX - canvas.getBoundingClientRect().left - paddle.width / 2;
+  paddle.x = getCanvasX(touch) - paddle.width / 2;
   e.preventDefault();
-}, { passive: false 
-});
+}, { passive: false });
 
     requestAnimationFrame(draw); // Start rendering loop to show start screen
 
@@ -230,12 +254,12 @@ for (let r = 0; r < rows; r++) {
     else if (Math.random() < 0.2) {
       brick.special = true;
       brick.effect = Math.random() < 0.5 ? "extend" : "shrink";
-      brick.strength = isStrong ? 5 : 1;
+      brick.strength = isStrong ? 3 : 1;
       brick.type = "special";
     }
     // Vanlig blokk
     else {
-      brick.strength = isStrong ? 5 : 1;
+      brick.strength = isStrong ? 3 : 1;
       brick.type = "normal";
     }
 
@@ -533,17 +557,45 @@ function detectBallCollision(b) {
           } else {
             score += 1;
             const color = brick.special ? "red" : "white";
+            if (brick.bonusScore) {
+            score += 50;
             fallingTexts.push({
-              text: "POES",
+              text: "50",
               x: brick.x + brickWidth / 2,
               y: brick.y,
               speed: 2,
-              color,
-              blink: false,
+              color: "gold",
+              blink: true,
               hit: false,
-              frame: 0,
-              bonus: brick.effect || null
+              frame: 0
             });
+          } else {
+            score += 1;
+            // Vis +POES for extend, -POES for shrink, ellers POES
+            let text = "POES";
+            let color = brick.special ? "red" : "white";
+            let blink = false;
+            if (brick.special && brick.effect === "extend") {
+              text = "POES";
+              color = "#0000ff"; // blå for utvidelse
+              blink = true; // blinkende for utvidelse
+            } else if (brick.special && brick.effect === "shrink") {
+              text = "POES";
+              color = "#800000"; // mørkerød for krymping
+              blink = true; // blinkende for krymping
+            }
+  fallingTexts.push({
+    text,
+    x: brick.x + brickWidth / 2,
+    y: brick.y,
+    speed: 2,
+    color,
+    blink,
+    hit: false,
+    frame: 0,
+    bonus: brick.effect || null
+  });
+}
           }
         }
       }
@@ -704,6 +756,14 @@ function detectBallCollision(b) {
         };
         winMessage();
         gameOver = true;
+        
+        // 👇 LAGRE HIGHSCORE VED SEIER
+        const name = prompt("Write your name (max 10 letters):");
+        if (name) {
+          const trimmed = name.substring(0, 10);
+          db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
+          loadHighscores();
+        }
         return;
       }
 
