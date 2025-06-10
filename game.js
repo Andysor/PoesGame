@@ -671,7 +671,6 @@ function detectBallCollision(b) {
       
       if (gameOver) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  //drawDynamicBackground(); // Tegn bakgrunn      
   ctx.fillStyle = "red";
   ctx.font = "40px Arial";
   ctx.textAlign = "center";
@@ -683,22 +682,24 @@ function detectBallCollision(b) {
 
   // 👇 Vis highscore-listen hvis tilgjengelig
   if (highscoreList.length > 0) {
-  let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-  let lineHeight = fontSize * 1.4;
+    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
+    let lineHeight = fontSize * 1.4;
 
-  ctx.font = `${fontSize}px Arial`;
-  ctx.fillStyle = "white";
-  ctx.textAlign = "left";
-  ctx.fillText("Topp 10 Highscores:", 50, 170);
+    ctx.font = `${fontSize}px Arial`;
+    ctx.fillStyle = "white";
+    ctx.textAlign = "left";
+    ctx.fillText("Topp 10 Highscores:", 50, 170);
 
-  highscoreList.forEach((entry, i) => {
-    const y = 170 + lineHeight * (i + 1);
-    ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
-  });
-} else {
+    highscoreList.forEach((entry, i) => {
+      const y = 170 + lineHeight * (i + 1);
+      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
+    });
+  } else {
     loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
   }
 
+  // 👉 Fortsett å tegne draw() så highscore vises når listen er klar
+  requestAnimationFrame(draw);
   return;
 }
       
@@ -735,29 +736,48 @@ function detectBallCollision(b) {
       collisionDetection();
 
       if (bricks.flat().every(brick => brick.destroyed)) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = "40px Arial";
-        ctx.fillStyle = "red";
-        ctx.textAlign = "center";
-        let blink = true;
-        let winMessage = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          if (blink) ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, canvas.height / 2);
-          blink = !blink;
-          requestAnimationFrame(winMessage);
-        };
-        winMessage();
-        gameOver = true;
-        
-        // 👇 LAGRE HIGHSCORE VED SEIER
-        const name = playerName;
-        if (name) {
-          const trimmed = name.substring(0, 10);
-          db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
-          loadHighscores();
-        }
-        return;
-      }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = "40px Arial";
+  ctx.fillStyle = "red";
+  ctx.textAlign = "center";
+  ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
+
+  ctx.font = "20px Arial";
+  ctx.fillStyle = "white";
+  ctx.fillText("Du vant!", canvas.width / 2, 120);
+
+  // 👇 Vis highscore-listen hvis tilgjengelig
+  if (highscoreList.length > 0) {
+    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
+    let lineHeight = fontSize * 1.4;
+
+    ctx.font = `${fontSize}px Arial`;
+    ctx.fillStyle = "white";
+    ctx.textAlign = "left";
+    ctx.fillText("Topp 10 Highscores:", 50, 170);
+
+    highscoreList.forEach((entry, i) => {
+      const y = 170 + lineHeight * (i + 1);
+      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
+    });
+  } else {
+    loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
+  }
+
+  // Lagre highscore én gang
+  if (!gameOver) {
+    const name = playerName;
+    if (name) {
+      const trimmed = name.substring(0, 10);
+      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
+      loadHighscores();
+    }
+  }
+
+  gameOver = true;
+  requestAnimationFrame(draw); // Fortsett å tegne så highscore vises når listen er klar
+  return;
+}
 
       if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
         ball.dx = -ball.dx;
