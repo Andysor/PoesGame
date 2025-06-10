@@ -167,23 +167,24 @@ function loadLevel(levelNum) {
 
   bricks = [];
   for (let r = 0; r < rows; r++) {
-    bricks[r] = [];
-    for (let c = 0; c < cols; c++) {
-      bricks[r][c] = {
-  type: level[r][c].type || "normal",
-  destroyed: !!level[r][c].destroyed,
-  strength: level[r][c].strength !== undefined
-    ? level[r][c].strength
-    : (level[r][c].type === "special" ? 3 : 1),
-  bonusScore: !!level[r][c].bonusScore,
-  extraBall: !!level[r][c].extraBall,
-  special: !!level[r][c].special,
-  effect: level[r][c].effect || null,
-  x: c * (brickWidth + 5) + 20,
-  y: r * (brickHeight + 4) + 80
-};
-    }
+  bricks[r] = [];
+  for (let c = 0; c < cols; c++) {
+    const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
+    bricks[r][c] = {
+      type: b.type || "normal",
+      destroyed: !!b.destroyed,
+      strength: b.strength !== undefined
+        ? b.strength
+        : (b.type === "special" ? 3 : 1),
+      bonusScore: !!b.bonusScore,
+      extraBall: !!b.extraBall,
+      special: !!b.special,
+      effect: b.effect || null,
+      x: c * (brickWidth + 5) + 20,
+      y: r * (brickHeight + 4) + 80
+    };
   }
+}
   maxLevelReached = false;
   resetLevelState();
   draw();
@@ -598,10 +599,10 @@ function detectBallCollision(b) {
         }
 
         // Spill lyd
-        if (!brick.lastHitTime || Date.now() - brick.lastHitTime > 50) {
-        playHitSound();
-        brick.lastHitTime = Date.now();
-}
+        //if (!brick.lastHitTime || Date.now() - brick.lastHitTime > 50) {
+        //playHitSound();
+       // brick.lastHitTime = Date.now();
+//}
 
 
         // Poesklap pause kun for hovedball
