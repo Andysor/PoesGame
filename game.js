@@ -44,7 +44,7 @@ function startGameWithName() {
 
 }
     const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
-    const PADDLE_TOUCH_OFFSET = 100; // Avstand fra touchpunkt til padelens midtpunkt
+    const PADDLE_TOUCH_OFFSET = 150; // Avstand fra touchpunkt til padelens midtpunkt
     let extraBalls = [];
     let showPoesklap = false;
     let poesklapTimer = 0;
@@ -170,25 +170,41 @@ function loadLevel(levelNum) {
 
 
   bricks = [];
-  for (let r = 0; r < rows; r++) {
-  bricks[r] = [];
-  for (let c = 0; c < cols; c++) {
-    const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
-    bricks[r][c] = {
-      type: b.type || "normal",
-      destroyed: !!b.destroyed,
-      strength: b.strength !== undefined
-        ? b.strength
-        : (b.type === "special" ? 3 : 1),
-      bonusScore: !!b.bonusScore,
-      extraBall: !!b.extraBall,
-      special: !!b.special,
-      effect: b.effect || null,
-      x: c * (brickWidth + 5) + 20,
-      y: r * (brickHeight + 4) + 80
-    };
-  }
-}
+    for (let r = 0; r < rows; r++) {
+    bricks[r] = [];
+        for (let c = 0; c < cols; c++) {
+            const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
+            bricks[r][c] = {
+            type: b.type || "normal",
+            destroyed: !!b.destroyed,
+            strength: b.strength !== undefined
+                ? b.strength
+                : (b.type === "special" ? 3 : 1),
+            bonusScore: !!b.bonusScore,
+            extraBall: !!b.extraBall,
+            special: !!b.special,
+            effect: b.effect || null,
+            x: c * (brickWidth + 5) + 20,
+            y: r * (brickHeight + 4) + 80
+            };
+        }
+    }
+
+    // Finn alle brikker som ikke er ødelagt
+    let availableBricks = [];
+    for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+        if (!bricks[r][c].destroyed) {
+        availableBricks.push(bricks[r][c]);
+        }
+    }
+    }
+    // Velg én tilfeldig brikke og gi den ekstra liv
+    if (availableBricks.length > 0) {
+    const idx = Math.floor(Math.random() * availableBricks.length);
+    availableBricks[idx].extraLife = true;
+    }
+
   maxLevelReached = false;
     resetLevelState();
     levelLoaded = true;
@@ -219,7 +235,7 @@ ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     highscoreList.forEach((entry, i) => {
       const y = 170 + lineHeight * (i + 1);
-      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
+      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
     });
   } else {
     loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
@@ -439,10 +455,28 @@ function drawBricks() {
     if (!brickWidth || brickWidth === 0) return;
     const shineOffset = (Date.now() / 15) % brickWidth;
 
-    for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const b = bricks[r][c];
-      if (b.destroyed) continue;
+        for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+        const b = bricks[r][c];
+        if (b.destroyed) continue;
+
+        // ❤️ Tegn hjerte på brikken hvis ekstra liv
+        if (b.extraLife) {
+        // Tegn rød hjerte på brikken
+        ctx.save();
+        ctx.beginPath();
+        const cx = b.x + brickWidth / 2;
+        const cy = b.y + brickHeight / 2 + 2;
+        const size = Math.min(brickWidth, brickHeight) / 2.5;
+        ctx.moveTo(cx, cy + size / 3);
+        ctx.bezierCurveTo(cx - size, cy - size / 2, cx - size, cy + size, cx, cy + size);
+        ctx.bezierCurveTo(cx + size, cy + size, cx + size, cy - size / 2, cx, cy + size / 3);
+        ctx.fillStyle = "red";
+        ctx.fill();
+        ctx.restore();
+        // Fortsett å tegne resten av brikken under hjertet hvis ønsket
+    }
+
 
       // 🌭 Pølseblokk med bilde (ingen blinking)
     if (b.bonusScore) {
@@ -510,10 +544,19 @@ function drawDynamicBackground() {
 
 
 
-    function drawFallingTexts() {
+ function drawFallingTexts() {
   ctx.textAlign = "center";
   fallingTexts.forEach(t => {
     ctx.save();
+
+    // Tegn hjerte større og i rødt hvis det er ekstra liv
+    if (t.isHeart) {
+      ctx.font = t.hit ? `${30 + t.frame}px Arial` : "30px Arial";
+      ctx.fillStyle = "red";
+      ctx.fillText("♥", t.x, t.y);
+      ctx.restore();
+      return;
+    }
 
     if (t.hit) {
       ctx.globalAlpha = 1 - t.frame / 20;
@@ -547,9 +590,17 @@ function updateFallingTexts() {
       t.x < paddle.x + paddle.width &&
       !t.hit
     ) {
-      score++;
+      //score++;
       t.hit = true;
       t.frame = 0; // start animasjon
+
+      // ❤️ Ekstra liv: hvis det er et hjerte, gi liv
+      if (t.isHeart) {
+        lives++;
+        // (valgfritt: spill lyd eller animasjon)
+      } else {
+        score++;
+      }
 
       // 📳 Vibrer på mobil
       if ("vibrate" in navigator) {
@@ -606,25 +657,18 @@ function detectBallCollision(b) {
 
         let speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
         if (speed < MAX_SPEED) {
-        let factor = 1.01; // Øk farten med 1% for hvert treff
-        b.dx *= factor;
-        b.dy *= factor;
+          let factor = 1.01; // Øk farten med 1% for hvert treff
+          b.dx *= factor;
+          b.dy *= factor;
         }
-
-        // Spill lyd
-        //if (!brick.lastHitTime || Date.now() - brick.lastHitTime > 50) {
-        //playHitSound();
-       // brick.lastHitTime = Date.now();
-//}
-
 
         // Poesklap pause kun for hovedball
         if (brick.extraBall && b === ball) {
-  showPoesklap = true;
-  poesklapTimer = Date.now();
-  playPoesklapSound();
-  // Ikke pause ballen!
-}
+          showPoesklap = true;
+          poesklapTimer = Date.now();
+          playPoesklapSound();
+          // Ikke pause ballen!
+        }
 
         // Reduser styrke
         brick.strength--;
@@ -646,21 +690,6 @@ function detectBallCollision(b) {
             });
           } else {
             score += 1;
-            const color = brick.special ? "red" : "white";
-            if (brick.bonusScore) {
-            score += 50;
-            fallingTexts.push({
-              text: "50",
-              x: brick.x + brickWidth / 2,
-              y: brick.y,
-              speed: 2,
-              color: "gold",
-              blink: true,
-              hit: false,
-              frame: 0
-            });
-          } else {
-            score += 1;
             // Vis +POES for extend, -POES for shrink, ellers POES
             let text = "POES";
             let color = brick.special ? "red" : "white";
@@ -668,24 +697,38 @@ function detectBallCollision(b) {
             if (brick.special && brick.effect === "extend") {
               text = "POES";
               color = "#0000ff"; // blå for utvidelse
-              blink = true; // blinkende for utvidelse
+              blink = true;
             } else if (brick.special && brick.effect === "shrink") {
               text = "POES";
               color = "#800000"; // mørkerød for krymping
-              blink = true; // blinkende for krymping
+              blink = true;
             }
-  fallingTexts.push({
-    text,
-    x: brick.x + brickWidth / 2,
-    y: brick.y,
-    speed: 2,
-    color,
-    blink,
-    hit: false,
-    frame: 0,
-    bonus: brick.effect || null
-  });
-}
+            fallingTexts.push({
+              text,
+              x: brick.x + brickWidth / 2,
+              y: brick.y,
+              speed: 2,
+              color,
+              blink,
+              hit: false,
+              frame: 0,
+              bonus: brick.effect || null
+            });
+          }
+
+          // ❤️ Ekstra liv: lag et fallende hjerte
+          if (brick.extraLife) {
+            fallingTexts.push({
+              text: "♥",
+              x: brick.x + brickWidth / 2,
+              y: brick.y,
+              speed: 2,
+              color: "red",
+              blink: false,
+              hit: false,
+              frame: 0,
+              isHeart: true
+            });
           }
         }
       }
@@ -697,19 +740,21 @@ function detectBallCollision(b) {
 
 
 
-    function drawScore() {
-      ctx.font = "16px Arial";
-      ctx.fillStyle = "white";
-      ctx.font = "24px Arial";
-      ctx.textAlign = "left";
-      ctx.fillStyle = "white";
-      ctx.fillText("Score: " + score, 20, 40);
+function drawScore() {
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "white";
+    ctx.fillText("Level: " + currentLevel, 20, 20);
 
-      const lifeSize = 40; // større kattehoder
+    ctx.fillText("Score: " + score, 20, 40);
 
-      for (let i = 0; i < lives; i++) {
-      const x = canvas.width - (lifeSize + 10) * (i + 1);
-      const y = 10;
+    const lifeSize = 40; // større kattehoder
+
+    for (let i = 0; i < lives; i++) {
+    const x = canvas.width - (lifeSize + 10) * (i + 1);
+    const y = 10;
 
   if (!drawScore.img) {
     drawScore.img = new Image();
@@ -723,7 +768,7 @@ function detectBallCollision(b) {
   }
 }
 
-    }
+}
 
 function startGame() {
   if (!gameStarted) {
@@ -785,7 +830,7 @@ function draw() {
 
     highscoreList.forEach((entry, i) => {
       const y = 170 + lineHeight * (i + 1);
-      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score}`, 50, y);
+      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
     });
   } else {
     loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
@@ -850,8 +895,13 @@ function draw() {
     // Lagre highscore én gang
     const name = playerName;
     if (name) {
-      const trimmed = name.substring(0, 10);
-      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
+        const trimmed = name.substring(0, 10);
+        db.collection("highscores").add({
+        name: trimmed,
+        score,
+        level: currentLevel, // <-- legg til dette feltet
+        timestamp: Date.now()
+    });
       loadHighscores();
     }
 
