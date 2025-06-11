@@ -670,10 +670,11 @@ function updateFallingTexts() {
 
     // Kollisjon med padelen
     if (
-      t.y >= paddle.y &&
-      t.x > paddle.x &&
-      t.x < paddle.x + paddle.width &&
-      !t.hit
+        t.y >= paddle.y &&                // Nederst på teksten har nådd padelens topp
+        t.y <= paddle.y + paddle.height &&// Teksten er ikke under padelens bunn
+        t.x > paddle.x &&
+        t.x < paddle.x + paddle.width &&
+        !t.hit
     ) {
       //score++;
       t.hit = true;
