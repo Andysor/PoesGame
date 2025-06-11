@@ -243,108 +243,123 @@ function loadLevel(levelNum) {
       return res.json();
     })
     .then(level => {
-  rows = level.length;
-  cols = level[0].length;
+      rows = level.length;
+      cols = level[0].length;
 
-  // Oppdater brickWidth og brickHeight hvis du vil at alt skal få plass:
-  // brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
-  // brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
-    brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
-    brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
+      brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
+      brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
 
-
-  bricks = [];
-    for (let r = 0; r < rows; r++) {
-    bricks[r] = [];
+      bricks = [];
+      for (let r = 0; r < rows; r++) {
+        bricks[r] = [];
         for (let c = 0; c < cols; c++) {
-            const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
-            bricks[r][c] = {
+          const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
+          bricks[r][c] = {
             type: b.type || "normal",
             destroyed: !!b.destroyed,
             strength: b.strength !== undefined
-                ? b.strength
-                : (b.type === "special" ? 3 : 1),
+              ? b.strength
+              : (b.type === "special" ? 3 : 1),
             bonusScore: !!b.bonusScore,
             extraBall: !!b.extraBall,
             special: !!b.special,
             effect: b.effect || null,
             x: c * (brickWidth + 5) + 20,
             y: r * (brickHeight + 4) + 80
-            };
+          };
         }
-    }
+      }
 
-    // Finn alle brikker som ikke er ødelagt
-    let availableBricks = [];
-    for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-        if (!bricks[r][c].destroyed) {
-        availableBricks.push(bricks[r][c]);
+      // Tilbakestill variabler for nytt level
+      resetLevelState();
+
+      // --- START: Kun normalbrikker får extraLife og hasSkull, og aldri begge samtidig ---
+      // Finn alle normalbrikker som ikke er ødelagt
+      let normalBricks = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const b = bricks[r][c];
+          if (!b.destroyed && b.type === "normal") {
+            normalBricks.push(b);
+          }
         }
-    }
-    }
-    // Velg én tilfeldig brikke og gi den ekstra liv
-    if (availableBricks.length > 0) {
-    const idx = Math.floor(Math.random() * availableBricks.length);
-    availableBricks[idx].extraLife = true;
-    }
+      }
 
-  maxLevelReached = false;
-    resetLevelState();
-    levelLoaded = true;
-    requestAnimationFrame(draw); // Start draw-loopen
-})
+      // Velg én tilfeldig normalbrikke og gi den ekstra liv
+      if (normalBricks.length > 0) {
+        const idx = Math.floor(Math.random() * normalBricks.length);
+        normalBricks[idx].extraLife = true;
+      }
+
+      // Lag skullCandidates: normalbrikker uten extraLife
+      let skullCandidates = normalBricks.filter(brick => !brick.extraLife);
+
+      // Legg til 3 dødningehoder tilfeldig plassert på normalbrikker uten extraLife
+      for (let i = 0; i < 3; i++) {
+        if (skullCandidates.length > 0) {
+          const idx = Math.floor(Math.random() * skullCandidates.length);
+          const brick = skullCandidates[idx];
+          brick.hasSkull = true;
+          skullCandidates.splice(idx, 1);
+        }
+      }
+      // --- SLUTT: Kun normalbrikker får extraLife og hasSkull, og aldri begge samtidig ---
+
+      console.log("Antall dødningehoder:", normalBricks.filter(b => b.hasSkull).length);
+
+      maxLevelReached = false;
+      levelLoaded = true;
+      requestAnimationFrame(draw); // Start draw-loopen
+    })
     .catch(() => {
-  maxLevelReached = true;
-  gameOver = true;
-  gameStarted = false;
+      maxLevelReached = true;
+      gameOver = true;
+      gameStarted = false;
 
-  // Lagre highscore én gang når du har rundet spillet
-  const name = playerName;
-  if (name) {
-    const trimmed = name.substring(0, 10);
-    db.collection("highscores").add({
-      name: trimmed,
-      score,
-      level: currentLevel - 1, // Siste level fullført
-      character: selectedCharacter,
-      timestamp: Date.now()
+      // Lagre highscore én gang når du har rundet spillet
+      const name = playerName;
+      if (name) {
+        const trimmed = name.substring(0, 10);
+        db.collection("highscores").add({
+          name: trimmed,
+          score,
+          level: currentLevel - 1, // Siste level fullført
+          character: selectedCharacter,
+          timestamp: Date.now()
+        });
+        loadHighscores();
+      }
+
+      // Vis "Du har rundet spillet!" eller lignende
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "40px Arial";
+      ctx.fillStyle = "red";
+      ctx.textAlign = "center";
+      ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
+
+      // 👇 Vis highscore-listen hvis tilgjengelig
+      if (highscoreList.length > 0) {
+        let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
+        let lineHeight = fontSize * 1.4;
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillStyle = "white";
+        ctx.textAlign = "left";
+        ctx.fillText("Topp 10 Highscores:", 50, 170);
+
+        highscoreList.forEach((entry, i) => {
+          const y = 170 + lineHeight * (i + 1);
+          ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
+        });
+      } else {
+        loadHighscores();
+      }
+
+      // Ikke start draw-loopen her!
+      // Ikke kall requestAnimationFrame(draw);
+
+      return;
     });
-    loadHighscores();
-  }
-
-  // Vis "Du har rundet spillet!" eller lignende
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = "40px Arial";
-  ctx.fillStyle = "red";
-  ctx.textAlign = "center";
-  ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
-
-  // 👇 Vis highscore-listen hvis tilgjengelig
-  if (highscoreList.length > 0) {
-    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-    let lineHeight = fontSize * 1.4;
-    ctx.font = `${fontSize}px Arial`;
-    ctx.fillStyle = "white";
-    ctx.textAlign = "left";
-    ctx.fillText("Topp 10 Highscores:", 50, 170);
-
-    highscoreList.forEach((entry, i) => {
-      const y = 170 + lineHeight * (i + 1);
-      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
-    });
-  } else {
-    loadHighscores();
-  }
-
-  // Ikke start draw-loopen her!
-  // Ikke kall requestAnimationFrame(draw);
-
-  return;
-});
-}
-
-// Tilbakestill variabler for nytt level
+}// Tilbakestill variabler for nytt level
 function resetLevelState() {
   //score = 0;
   //lives = 3;
@@ -530,23 +545,7 @@ function drawBricks() {
         const b = bricks[r][c];
         if (b.destroyed) continue;
 
-        // ❤️ Tegn hjerte på brikken hvis ekstra liv
-        if (b.extraLife) {
-        // Tegn rød hjerte på brikken
-        ctx.save();
-        ctx.beginPath();
-        const cx = b.x + brickWidth / 2;
-        const cy = b.y + brickHeight / 2 + 2;
-        const size = Math.min(brickWidth, brickHeight) / 2.5;
-        ctx.moveTo(cx, cy + size / 3);
-        ctx.bezierCurveTo(cx - size, cy - size / 2, cx - size, cy + size, cx, cy + size);
-        ctx.bezierCurveTo(cx + size, cy + size, cx + size, cy - size / 2, cx, cy + size / 3);
-        ctx.fillStyle = "red";
-        ctx.fill();
-        ctx.restore();
-        // Fortsett å tegne resten av brikken under hjertet hvis ønsket
-    }
-
+        
 
       // 🌭 Pølseblokk med bilde (ingen blinking)
     if (b.bonusScore) {
@@ -580,18 +579,53 @@ function drawBricks() {
         baseColor = "#0099ff"; // blå for vanlig
       }
 
-      // ✨ Skinnende gradient
-      const gradient = ctx.createLinearGradient(b.x, b.y, b.x + brickWidth, b.y);
-      gradient.addColorStop(0, lightenColor(baseColor, 0.05));
-      gradient.addColorStop(shineOffset / brickWidth, lightenColor(baseColor, 0.5));
-      gradient.addColorStop(1, lightenColor(baseColor, 0.05));
+      // ✨ Skinnende gradient kun for ikke-normal
+    if (b.type !== "normal") {
+        const gradient = ctx.createLinearGradient(b.x, b.y, b.x + brickWidth, b.y);
+        gradient.addColorStop(0, lightenColor(baseColor, 0.05));
+        gradient.addColorStop(shineOffset / brickWidth, lightenColor(baseColor, 0.5));
+        gradient.addColorStop(1, lightenColor(baseColor, 0.05));
+        ctx.fillStyle = gradient;
+    } else {
+        ctx.fillStyle = baseColor; // Ingen shimmer på normal
+      }
 
-      ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.rect(b.x, b.y, brickWidth, brickHeight);
       ctx.fill();
       ctx.closePath();
+    
+    // ❤️ Tegn hjerte på brikken hvis ekstra liv
+    if (b.extraLife) {
+        // Tegn rød hjerte på brikken
+        ctx.save();
+        ctx.beginPath();
+        const cx = b.x + brickWidth / 2;
+        const cy = b.y + brickHeight / 2 + 2;
+        const size = Math.min(brickWidth, brickHeight) / 2.5;
+        ctx.moveTo(cx, cy + size / 3);
+        ctx.bezierCurveTo(cx - size, cy - size / 2, cx - size, cy + size, cx, cy + size);
+        ctx.bezierCurveTo(cx + size, cy + size, cx + size, cy - size / 2, cx, cy + size / 3);
+        ctx.fillStyle = "red";
+        ctx.fill();
+        ctx.restore();
+        // Fortsett å tegne resten av brikken under hjertet hvis ønsket
     }
+
+    // ...i drawBricks, etter at brikken er tegnet...
+    if (b.hasSkull) {
+      ctx.save();
+      ctx.font = `${Math.floor(brickHeight * 0.8)}px Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.strokeText("☠", b.x + brickWidth / 2, b.y + brickHeight / 2);
+      ctx.fillText("☠", b.x + brickWidth / 2, b.y + brickHeight / 2);
+      ctx.restore();
+    }
+      }
   }
 }
 
@@ -632,11 +666,28 @@ function drawDynamicBackground() {
       return;
     }
 
+    // Tegn dødningehode
+    if (t.isSkull) {
+        ctx.font = t.hit ? `${30 + t.frame}px Arial` : "30px Arial";
+        ctx.fillStyle = "black";
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.strokeText("☠", t.x, t.y);
+        ctx.fillText("☠", t.x, t.y);
+        ctx.restore();
+        return;
+    }
+
     // Tegn hjerte større og i rødt hvis det er ekstra liv
     if (t.isHeart) {
-      ctx.font = t.hit ? `${30 + t.frame}px Arial` : "30px Arial";
+      // Skaler opp fra 1x til 3x størrelse over 40 frames
+      let scale = t.hit ? 1 + 9 * Math.min(t.frame / 100, 1) : 1;
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.scale(scale, scale);
+      ctx.font = "30px Arial";
       ctx.fillStyle = "red";
-      ctx.fillText("♥", t.x, t.y);
+      ctx.fillText("♥", 0, 0);
       ctx.restore();
       return;
     }
@@ -666,32 +717,30 @@ function updateFallingTexts() {
   fallingTexts.forEach(t => {
     t.y += t.speed;
 
-
-
     // Kollisjon med padelen
     if (
-        t.y >= paddle.y &&                // Nederst på teksten har nådd padelens topp
-        t.y <= paddle.y + paddle.height &&// Teksten er ikke under padelens bunn
-        t.x > paddle.x &&
-        t.x < paddle.x + paddle.width &&
-        !t.hit
+      t.y >= paddle.y &&
+      t.y <= paddle.y + paddle.height &&
+      t.x > paddle.x &&
+      t.x < paddle.x + paddle.width &&
+      !t.hit
     ) {
-      //score++;
       t.hit = true;
       t.frame = 0; // start animasjon
 
-    if (t.isSausage) {
+      if (t.isSkull) {
+        lives--;
+        playLifeLossSound && playLifeLossSound();
+        gameStarted = false;
+        ball.dx = 0;
+        ball.dy = 0;
+        // Sett ballen på padelen
+        ball.x = paddle.x + paddle.width / 2;
+        ball.y = paddle.y - ball.radius;
+      } else if (t.isSausage) {
         score += 50;
-    } else if (t.isHeart) {
+      } else if (t.isHeart) {
         lives++;
-    } else {
-        score++;
-    }
-
-      // ❤️ Ekstra liv: hvis det er et hjerte, gi liv
-      if (t.isHeart) {
-        lives++;
-        // (valgfritt: spill lyd eller animasjon)
       } else {
         score++;
       }
@@ -779,62 +828,112 @@ function detectBallCollision(b) {
         // Reduser styrke
         brick.strength--;
         if (brick.strength <= 0) {
-          brick.destroyed = true;
+    brick.destroyed = true;
 
-        // 🌭 Pølsebonus
+    // NORMAL: Ingen fallingText, men kan ha powerup, og gir 2 poeng
+    if (brick.type === "normal") {
+        score += 2;
+
+        // Powerups for normal-brikker
         if (brick.bonusScore) {
-            score += 50;
             fallingTexts.push({
-            isSausage: true, // Bruk bilde
-            x: brick.x + brickWidth / 2,
-            y: brick.y,
-            speed: 4, // Dobbelt så fort
-            hit: false,
-            frame: 0
-        });
-          } else {
-            score += 1;
-            // Vis +POES for extend, -POES for shrink, ellers POES
-            let text = "POES";
-            let color = brick.special ? "red" : "white";
-            let blink = false;
-            if (brick.special && brick.effect === "extend") {
-              text = "POES";
-              color = "#0000ff"; // blå for utvidelse
-              blink = true;
-            } else if (brick.special && brick.effect === "shrink") {
-              text = "POES";
-              color = "#800000"; // mørkerød for krymping
-              blink = true;
-            }
-            fallingTexts.push({
-              text,
-              x: brick.x + brickWidth / 2,
-              y: brick.y,
-              speed: 2,
-              color,
-              blink,
-              hit: false,
-              frame: 0,
-              bonus: brick.effect || null
+                isSausage: true,
+                x: brick.x + brickWidth / 2,
+                y: brick.y,
+                speed: 4,
+                hit: false,
+                frame: 0
             });
-          }
-
-          // ❤️ Ekstra liv: lag et fallende hjerte
-          if (brick.extraLife) {
+        }
+        if (brick.extraBall) {
+            // Ekstra ball håndteres allerede i ball-collision over
+        }
+        if (brick.extraLife) {
             fallingTexts.push({
-              text: "♥",
+                text: "♥",
+                x: brick.x + brickWidth / 2,
+                y: brick.y,
+                speed: 2,
+                color: "red",
+                blink: false,
+                hit: false,
+                frame: 0,
+                isHeart: true
+            });
+        }
+
+        if (brick.hasSkull) {
+            fallingTexts.push({
+              text: "☠",
               x: brick.x + brickWidth / 2,
               y: brick.y,
               speed: 2,
-              color: "red",
+              color: "#fff",
               blink: false,
               hit: false,
               frame: 0,
-              isHeart: true
+              isSkull: true
             });
-          }
         }
+
+
+        return; // Ikke lag fallingText for normal
+    }
+
+    // SPECIAL, SAUSAGE, EXTRA BALL: FallingText som før
+    // Hvis brikken har ekstra liv, lag KUN hjerte fallingText
+    if (brick.extraLife) {
+        fallingTexts.push({
+            text: "♥",
+            x: brick.x + brickWidth / 2,
+            y: brick.y,
+            speed: 2,
+            color: "red",
+            blink: false,
+            hit: false,
+            frame: 0,
+            isHeart: true
+        });
+    } 
+    
+    // Hvis brikken har dødningehode, lag skull fallingText
+     else if (brick.bonusScore) {
+        score += 50;
+        fallingTexts.push({
+            isSausage: true,
+            x: brick.x + brickWidth / 2,
+            y: brick.y,
+            speed: 4,
+            hit: false,
+            frame: 0
+        });
+    } else {
+        score += 1;
+        let text = "POES";
+        let color = brick.special ? "red" : "white";
+        let blink = false;
+        if (brick.special && brick.effect === "extend") {
+            text = "POES";
+            color = "#0000ff";
+            blink = false;
+        } else if (brick.special && brick.effect === "shrink") {
+            text = "POES";
+            color = "#800000";
+            blink = false;
+        }
+        fallingTexts.push({
+            text,
+            x: brick.x + brickWidth / 2,
+            y: brick.y,
+            speed: 2,
+            color,
+            blink,
+            hit: false,
+            frame: 0,
+            bonus: brick.effect || null
+        });
+    }
+}
       }
     }
   }
