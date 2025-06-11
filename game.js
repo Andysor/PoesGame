@@ -425,7 +425,7 @@ resizeCanvas();
 
 // Startfart og maks fart for ballen
 const BASE_INITIAL_SPEED = 1.5;
-const BASE_MAX_SPEED = 6.0;
+const BASE_MAX_SPEED = 4.0;
 
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
@@ -743,7 +743,7 @@ function drawDynamicBackground() {
   if (levelBackgroundImg) {
     ctx.save();
     // Reduser lysstyrke og kontrast (juster verdiene etter behov)
-    ctx.filter = "brightness(0.6) contrast(0.7)";
+    ctx.filter = "brightness(0.3) contrast(0.3)";
     ctx.drawImage(levelBackgroundImg, 0, 0, canvas.width, canvas.height);
     ctx.filter = "none";
     ctx.restore();
@@ -785,7 +785,7 @@ function drawDynamicBackground() {
 
     // Tegn dødningehode
     if (t.isSkull) {
-        ctx.font = t.hit ? `${30 + t.frame}px Arial` : "30px Arial";
+        ctx.font = t.hit ? `${60 + t.frame}px Arial` : "60px Arial";
         ctx.fillStyle = "black";
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
@@ -802,7 +802,7 @@ function drawDynamicBackground() {
       ctx.save();
       ctx.translate(t.x, t.y);
       ctx.scale(scale, scale);
-      ctx.font = "30px Arial";
+      ctx.font = "60px Arial";
       ctx.fillStyle = "red";
       ctx.fillText("♥", 0, 0);
       ctx.restore();
@@ -811,9 +811,9 @@ function drawDynamicBackground() {
 
     if (t.hit) {
       ctx.globalAlpha = 1 - t.frame / 20;
-      ctx.font = `${20 + t.frame}px Arial`;
+      ctx.font = `${40 + t.frame}px Arial`;
     } else {
-      ctx.font = "20px Arial";
+      ctx.font = "40px Arial";
     }
 
     // ✨ Blinkende gulltekst
@@ -957,7 +957,7 @@ function detectBallCollision(b) {
                 isSausage: true,
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
-                speed: 4,
+                speed: 2,
                 hit: false,
                 frame: 0
             });
@@ -1033,12 +1033,12 @@ function detectBallCollision(b) {
     // Kun 30% sjanse for fallingText hvis shrink/grow
     if (!isShrinkOrGrow || Math.random() < 0.3) {
         if (brick.special && brick.effect === "extend") {
-            text = "POES";
-            color = "#0000ff";
+            text = "😃"; // Smilefjes for expand
+            color = "#fff";
             blink = false;
         } else if (brick.special && brick.effect === "shrink") {
-            text = "POES";
-            color = "#800000";
+            text = "👺"; // Rød firkant for shrink
+            color = "#fff";
             blink = false;
         }
         fallingTexts.push({
