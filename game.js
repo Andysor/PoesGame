@@ -1,4 +1,5 @@
 // Legg til øverst i filen:
+let levelBackgroundImg = null;
 let loadingNextLevel = false;
 let readyToStart = false;
 let selectedCharacter = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
@@ -207,7 +208,7 @@ canvas.addEventListener("pointerdown", (e) => {
     gameOver = false;
     console.log("Til character select");
     return;
-  }
+}
   if (readyToStart && levelLoaded && !gameStarted) {
     canvas.style.display = "block";
     document.getElementById('character-select').style.display = "none";
@@ -309,6 +310,24 @@ function loadLevel(levelNum) {
 
       maxLevelReached = false;
       levelLoaded = true;
+
+      // ...etter at bricks er satt opp og før requestAnimationFrame(draw):
+      levelBackgroundImg = null;
+      const bgName = `level${currentLevel}`;
+      const exts = [".png", ".jpg", ".jpeg", ".webp"];
+      let found = false;
+      for (let ext of exts) {
+        const img = new Image();
+        img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${bgName}${ext}`;
+        img.onload = () => {
+      if (!found) {
+      levelBackgroundImg = img;
+      found = true;
+      draw(); // Oppdater skjermen med bakgrunn
+    }
+  };
+}
+
       requestAnimationFrame(draw); // Start draw-loopen
     })
     .catch(() => {
@@ -481,18 +500,71 @@ function getCanvasY(touch) {
 
 
     function drawBall() {
+  // Skygge
+  ctx.save();
+  ctx.globalAlpha = 0.4;
   ctx.beginPath();
+  ctx.arc(ball.x + 4, ball.y + 6, ball.radius * 1.05, 0, Math.PI * 2);
+  ctx.fillStyle = "#222";
+  ctx.fill();
+  ctx.restore();
+
+  // Hovedball
+  ctx.beginPath();
+  let grad = ctx.createRadialGradient(
+    ball.x - ball.radius / 2, ball.y - ball.radius / 2, ball.radius / 2,
+    ball.x, ball.y, ball.radius
+  );
+  grad.addColorStop(0, "#fff");
+  grad.addColorStop(0.3, "#ff6666");
+  grad.addColorStop(1, "#b20000");
+  ctx.fillStyle = grad;
   ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-  ctx.fillStyle = "#f00";
   ctx.fill();
   ctx.closePath();
 
+  // Glans
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+  ctx.arc(ball.x - ball.radius / 3, ball.y - ball.radius / 3, ball.radius / 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.restore();
+
+  // Ekstra baller (samme effekt)
   extraBalls.forEach(b => {
+    // Skygge
+    ctx.save();
+    ctx.globalAlpha = 0.3;
     ctx.beginPath();
+    ctx.arc(b.x + 3, b.y + 5, b.radius * 1.05, 0, Math.PI * 2);
+    ctx.fillStyle = "#222";
+    ctx.fill();
+    ctx.restore();
+
+    // Hovedball
+    ctx.beginPath();
+    let gradB = ctx.createRadialGradient(
+      b.x - b.radius / 2, b.y - b.radius / 2, b.radius / 2,
+      b.x, b.y, b.radius
+    );
+    gradB.addColorStop(0, "#fff");
+    gradB.addColorStop(0.3, "#66ff66");
+    gradB.addColorStop(1, "#008800");
+    ctx.fillStyle = gradB;
     ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#0f0"; // ekstra ball er grønn
     ctx.fill();
     ctx.closePath();
+
+    // Glans
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(b.x - b.radius / 3, b.y - b.radius / 3, b.radius / 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.restore();
   });
 }
 
@@ -590,10 +662,31 @@ function drawBricks() {
         ctx.fillStyle = baseColor; // Ingen shimmer på normal
       }
 
+      // Legg til skygge bak blokken
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = "#111";
+      ctx.fillRect(b.x + 4, b.y + 6, brickWidth, brickHeight);
+      ctx.restore();
+
+      // 3D-gradient på selve blokken
       ctx.beginPath();
       ctx.rect(b.x, b.y, brickWidth, brickHeight);
+      let grad = ctx.createLinearGradient(b.x, b.y, b.x, b.y + brickHeight);
+      grad.addColorStop(0, lightenColor(baseColor, 0.35)); // topp-lys
+      grad.addColorStop(0.5, baseColor);                   // midt
+      grad.addColorStop(1, lightenColor(baseColor, -0.25)); // bunn-skygge
+      ctx.fillStyle = grad;
       ctx.fill();
       ctx.closePath();
+
+      // Lys "glans" øverst på blokken
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(b.x + 4, b.y + 4, brickWidth - 8, brickHeight * 0.22);
+      ctx.restore();
+
     
     // ❤️ Tegn hjerte på brikken hvis ekstra liv
     if (b.extraLife) {
@@ -630,15 +723,17 @@ function drawBricks() {
 }
 
 function drawDynamicBackground() {
-  // Lys gradient som endrer seg over tid
+  if (levelBackgroundImg) {
+    ctx.drawImage(levelBackgroundImg, 0, 0, canvas.width, canvas.height);
+    return;
+  }
+  // Fallback: gradient
   const t = Date.now() * 0.0003;
   const color1 = `hsl(${(t * 60) % 360}, 80%, 35%)`;
   const color2 = `hsl(${(t * 60 + 60) % 360}, 80%, 55%)`;
-
   const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
   grad.addColorStop(0, color1);
   grad.addColorStop(1, color2);
-
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -908,10 +1003,13 @@ function detectBallCollision(b) {
             frame: 0
         });
     } else {
-        score += 1;
-        let text = "POES";
-        let color = brick.special ? "red" : "white";
-        let blink = false;
+    score += 1;
+    let text = "POES";
+    let color = brick.special ? "red" : "white";
+    let blink = false;
+    let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
+    // Kun 30% sjanse for fallingText hvis shrink/grow
+    if (!isShrinkOrGrow || Math.random() < 0.3) {
         if (brick.special && brick.effect === "extend") {
             text = "POES";
             color = "#0000ff";
@@ -933,6 +1031,7 @@ function detectBallCollision(b) {
             bonus: brick.effect || null
         });
     }
+}
 }
       }
     }
