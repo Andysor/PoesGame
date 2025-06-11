@@ -238,6 +238,9 @@ let maxLevelReached = false;
 
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
+  currentLevel = levelNum;
+  updateSpeedForLevel(); // Øk fart for hvert level
+
   return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) throw new Error("No more levels");
@@ -320,13 +323,13 @@ function loadLevel(levelNum) {
         const img = new Image();
         img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${bgName}${ext}`;
         img.onload = () => {
-      if (!found) {
-      levelBackgroundImg = img;
-      found = true;
-      draw(); // Oppdater skjermen med bakgrunn
-    }
-  };
-}
+          if (!found) {
+            levelBackgroundImg = img;
+            found = true;
+            draw(); // Oppdater skjermen med bakgrunn
+          }
+        };
+      }
 
       requestAnimationFrame(draw); // Start draw-loopen
     })
@@ -378,7 +381,9 @@ function loadLevel(levelNum) {
 
       return;
     });
-}// Tilbakestill variabler for nytt level
+}
+
+// Tilbakestill variabler for nytt level
 function resetLevelState() {
   //score = 0;
   //lives = 3;
@@ -406,11 +411,11 @@ function lightenColor(hex, factor) {
 
 let paddleHeads = 3; // starter med 3
 const maxPaddleHeads = 6;
-const headUnit = canvas.width / 12; // bredde per hode
+const headUnit = canvas.width / 8; // bredde per hode
 
 let paddle = {
   width: paddleHeads * headUnit,
-  height: 40,
+  height: 60,
   x: canvas.width / 2 - (paddleHeads * headUnit) / 2,
   y: canvas.height - PADDLE_BOTTOM_MARGIN // Fra variabel
 };
@@ -418,14 +423,26 @@ let paddle = {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-let initialSpeed = 2.5; // Startfart for ballen
+// Startfart og maks fart for ballen
+const BASE_INITIAL_SPEED = 1.5;
+const BASE_MAX_SPEED = 8;
+
+let initialSpeed = BASE_INITIAL_SPEED;
+let MAX_SPEED = BASE_MAX_SPEED;
+
+
+function updateSpeedForLevel() {
+  const speedMultiplier = Math.pow(1.05, currentLevel - 1); // 5% økning per level
+  initialSpeed = BASE_INITIAL_SPEED * speedMultiplier;
+  MAX_SPEED = BASE_MAX_SPEED * speedMultiplier;
+}
 
 function resetSpeed() {
   ball.dx = initialSpeed;
   ball.dy = -initialSpeed;
 }
 
-const MAX_SPEED = 12; // Maks fart for ballen
+// Maksimalt hastighetsforhold for ballen
 const MAX_SPEED_MULTIPLIER = 3;
 
 let ball = {
@@ -433,7 +450,7 @@ let ball = {
   y: paddle.y - 10,
   dx: 0,
   dy: 0,
-  radius: 8
+  radius: 12
 };
     let rightPressed = false;
     let leftPressed = false;
@@ -915,7 +932,7 @@ function detectBallCollision(b) {
                 y: brick.y + brickHeight / 2,
                 dx: mainSpeed * Math.cos(angle),
                 dy: -Math.abs(mainSpeed * Math.sin(angle)),
-                radius: 8,
+                radius: 12,
                 canBounce: false
             });
         }
