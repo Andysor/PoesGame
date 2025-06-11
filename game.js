@@ -3,8 +3,9 @@ let loadingNextLevel = false;
 let readyToStart = false;
 let selectedCharacter = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
 let playerName = "";
-
 let characterChosen = false;
+let showHighscores = false;
+
 document.querySelectorAll('.char-opt').forEach(img => {
   img.addEventListener('click', function() {
     if (characterChosen) return;
@@ -13,8 +14,18 @@ document.querySelectorAll('.char-opt').forEach(img => {
     document.querySelectorAll('.char-opt').forEach(i => i.style.border = "2px solid #fff");
     this.style.border = "4px solid gold";
     document.getElementById('character-select').style.display = "none";
-    document.getElementById('name-input-container').style.display = "block";
-    document.getElementById('player-name').focus();
+    // Hvis navn allerede er satt, hopp rett til spillstart
+    if (playerName && playerName.length > 0) {
+      document.getElementById('name-input-container').style.display = "none";
+      canvas.style.display = "block";
+      readyToStart = true;
+      gameStarted = false;
+      currentLevel = 1;
+      loadLevel(currentLevel);
+    } else {
+      document.getElementById('name-input-container').style.display = "block";
+      document.getElementById('player-name').focus();
+    }
     //resizeCanvas();
   });
 });
@@ -132,7 +143,22 @@ function playPoesklapSound() {
     const canvas = document.getElementById('arkanoid');
     const ctx = canvas.getContext('2d');
 
-
+function resetGameState() {
+  score = 0;
+  lives = 3;
+  currentLevel = 1;
+  extraBalls = [];
+  fallingTexts = [];
+  showHighscores = false;
+  gameOver = false;
+  gameStarted = false;
+  levelLoaded = false;
+  loadingNextLevel = false;
+  paddleHeads = 3;
+  paddle.width = paddleHeads * headUnit;
+  characterChosen = false;
+  // Nullstill evt. andre variabler du bruker
+}
     
 function resizeCanvas() {
   // Velg ønsket aspect ratio for mobil og PC
@@ -165,6 +191,44 @@ function resizeCanvas() {
   paddle.y = canvas.height - PADDLE_BOTTOM_MARGIN; // Fra variabel
   paddle.x = canvas.width / 2 - paddle.width / 2;
 }
+
+canvas.addEventListener("pointerdown", (e) => {
+  console.log("pointerdown", {gameOver, showHighscores, gameStarted});
+  if (gameOver && !showHighscores) {
+    showHighscores = true;
+    console.log("Viser highscore");
+    return;
+  }
+  if (gameOver && showHighscores) {
+    canvas.style.display = "none";
+    document.getElementById('character-select').style.display = "block";
+    resetGameState();
+    showHighscores = false;
+    gameOver = false;
+    console.log("Til character select");
+    return;
+  }
+  if (readyToStart && levelLoaded && !gameStarted) {
+    canvas.style.display = "block";
+    document.getElementById('character-select').style.display = "none";
+    gameStarted = true;
+    ball.dx = initialSpeed;
+    ball.dy = -initialSpeed;
+    return;
+  }
+  // Padle-styring kun hvis spillet er i gang
+  if (!gameStarted) return;
+  let x, y;
+  if (e.touches && e.touches[0]) {
+    x = getCanvasX(e.touches[0]);
+    y = getCanvasY(e.touches[0]);
+  } else {
+    x = e.clientX * (canvas.width / canvas.getBoundingClientRect().width);
+    y = e.clientY * (canvas.height / canvas.getBoundingClientRect().height);
+  }
+  paddle.x = x - paddle.width / 2;
+  paddle.y = y - PADDLE_TOUCH_OFFSET;
+});
 
 //Level load
 
@@ -233,6 +297,7 @@ function loadLevel(levelNum) {
     .catch(() => {
       maxLevelReached = true;
       gameOver = true;
+      gameStarted = false;
       // Vis "Du har rundet spillet!" eller lignende
 
 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -359,12 +424,6 @@ function getCanvasX(touch) {
   return (touch.clientX - rect.left) * (canvas.width / rect.width);
 }
 
-canvas.addEventListener('touchstart', e => {
-  const touch = e.touches[0];
-  paddle.x = getCanvasX(touch) - paddle.width / 2;
-  paddle.y = getCanvasY(touch) - PADDLE_TOUCH_OFFSET;
-});
-
 canvas.addEventListener('touchmove', e => {
   const touch = e.touches[0];
   paddle.x = getCanvasX(touch) - paddle.width / 2;
@@ -402,17 +461,6 @@ function getCanvasY(touch) {
       if (e.key === "ArrowRight") rightPressed = false;
       if (e.key === "ArrowLeft") leftPressed = false;
     });
-
-// Touchstart for mobil
-canvas.addEventListener("touchstart", e => {
-  if (gameOver) {
-    document.location.reload();
-  } else if (readyToStart && levelLoaded && !gameStarted) {
-    gameStarted = true;
-    ball.dx = initialSpeed;
-    ball.dy = -initialSpeed;
-  }
-});
 
 
     function drawBall() {
@@ -862,29 +910,32 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
   ctx.textAlign = "center";
   ctx.fillText("GAME OVER", canvas.width / 2, 80);
 
-  ctx.font = "20px Arial";
+  ctx.font = "28px Arial";
   ctx.fillStyle = "white";
-  ctx.fillText("Press R to restart", canvas.width / 2, 120);
+  ctx.fillText("Score: " + score, canvas.width / 2, 130);
 
-  // 👇 Vis highscore-listen hvis tilgjengelig
-  if (highscoreList.length > 0) {
-    let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-    let lineHeight = fontSize * 1.4;
+  ctx.font = "20px Arial";
+  ctx.fillText("Trykk for highscore", canvas.width / 2, 180);
 
-    ctx.font = `${fontSize}px Arial`;
-    ctx.fillStyle = "white";
-    ctx.textAlign = "left";
-    ctx.fillText("Topp 10 Highscores:", 50, 170);
-
-    highscoreList.forEach((entry, i) => {
-      const y = 170 + lineHeight * (i + 1);
-      ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
-    });
-  } else {
-    loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
+  // Vis highscore-listen først etter brukertrykk
+  if (showHighscores) {
+    // 👇 Vis highscore-listen hvis tilgjengelig
+    if (highscoreList.length > 0) {
+      let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
+      let lineHeight = fontSize * 1.4;
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = "white";
+      ctx.textAlign = "left";
+      ctx.fillText("Topp 10 Highscores:", 50, 230);
+      highscoreList.forEach((entry, i) => {
+        const y = 230 + lineHeight * (i + 1);
+        ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
+      });
+    } else {
+      loadHighscores();
+    }
   }
 
-  // 👉 Fortsett å tegne draw() så highscore vises når listen er klar
   requestAnimationFrame(draw);
   return;
 }
@@ -942,6 +993,7 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
     ctx.fillStyle = "white";
     ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
     gameOver = true;
+    gameStarted = false;
 
     // Lagre highscore én gang
     const name = playerName;
