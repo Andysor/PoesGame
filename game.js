@@ -68,7 +68,7 @@ function startGameWithName() {
     
     let lifeLossSound = new Audio('https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3');  // Lyd for livstap
 
-    lifeLossSound.volume = 0.3; // Juster volumet for livstap-lyd
+    lifeLossSound.volume = 0.2; // Juster volumet for livstap-lyd
     lifeLossSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
 
     const poesklapSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3");
@@ -78,7 +78,7 @@ function startGameWithName() {
     
 const hitSoundPool = Array.from({length: 20}, () => {
   const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3");
-  a.volume = 0.5;
+  a.volume = 0.1;
   return a;
 });
 let hitSoundIndex = 0;
@@ -425,7 +425,7 @@ resizeCanvas();
 
 // Startfart og maks fart for ballen
 const BASE_INITIAL_SPEED = 1.5;
-const BASE_MAX_SPEED = 8;
+const BASE_MAX_SPEED = 6.0;
 
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
@@ -741,7 +741,12 @@ function drawBricks() {
 
 function drawDynamicBackground() {
   if (levelBackgroundImg) {
+    ctx.save();
+    // Reduser lysstyrke og kontrast (juster verdiene etter behov)
+    ctx.filter = "brightness(0.6) contrast(0.7)";
     ctx.drawImage(levelBackgroundImg, 0, 0, canvas.width, canvas.height);
+    ctx.filter = "none";
+    ctx.restore();
     return;
   }
   // Fallback: gradient
