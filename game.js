@@ -295,24 +295,35 @@ function loadLevel(levelNum) {
     requestAnimationFrame(draw); // Start draw-loopen
 })
     .catch(() => {
-      maxLevelReached = true;
-      gameOver = true;
-      gameStarted = false;
-      // Vis "Du har rundet spillet!" eller lignende
+  maxLevelReached = true;
+  gameOver = true;
+  gameStarted = false;
 
-ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Lagre highscore én gang når du har rundet spillet
+  const name = playerName;
+  if (name) {
+    const trimmed = name.substring(0, 10);
+    db.collection("highscores").add({
+      name: trimmed,
+      score,
+      level: currentLevel - 1, // Siste level fullført
+      character: selectedCharacter,
+      timestamp: Date.now()
+    });
+    loadHighscores();
+  }
+
+  // Vis "Du har rundet spillet!" eller lignende
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = "40px Arial";
   ctx.fillStyle = "red";
   ctx.textAlign = "center";
   ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
 
-
-
   // 👇 Vis highscore-listen hvis tilgjengelig
   if (highscoreList.length > 0) {
     let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
     let lineHeight = fontSize * 1.4;
-
     ctx.font = `${fontSize}px Arial`;
     ctx.fillStyle = "white";
     ctx.textAlign = "left";
@@ -323,23 +334,14 @@ ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
     });
   } else {
-    loadHighscores(); // 🔁 Hent hvis den ikke er klar ennå
+    loadHighscores();
   }
 
-  // Lagre highscore én gang
-  if (!gameOver) {
-    const name = playerName;
-    if (name) {
-      const trimmed = name.substring(0, 10);
-      db.collection("highscores").add({ name: trimmed, score, timestamp: Date.now() });
-      loadHighscores();
-    }
-  }
+  // Ikke start draw-loopen her!
+  // Ikke kall requestAnimationFrame(draw);
 
-  gameOver = true;
-  requestAnimationFrame(draw); // Fortsett å tegne så highscore vises når listen er klar
   return;
-    });
+});
 }
 
 // Tilbakestill variabler for nytt level
@@ -871,6 +873,31 @@ function drawScore() {
 
 }
 
+function showHighscorePreview() {
+  // Eksempel-highscore hvis listen er tom
+  if (!highscoreList || highscoreList.length === 0) {
+    highscoreList = [
+      {
+        name: "andreaspoe",
+        score: 12341,
+        level: 10,
+        character: "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/braai.png",
+        timestamp: Date.now()
+      },
+      {
+        name: "POESPOES22",
+        score: 9000,
+        level: 5,
+        character: "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/rugby-ball.png",
+        timestamp: Date.now()
+      }
+    ];
+  }
+  gameOver = true;
+  showHighscores = true;
+  draw();
+}
+
 function startGame() {
   if (!gameStarted) {
     document.getElementById('character-select').style.display = "none";
@@ -908,33 +935,77 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
   ctx.fillStyle = "red";
   ctx.font = "40px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("GAME OVER", canvas.width / 2, 80);
+  ctx.fillText("SPEL VERBY!", canvas.width / 2, 80);
 
   ctx.font = "28px Arial";
   ctx.fillStyle = "white";
   ctx.fillText("Score: " + score, canvas.width / 2, 130);
 
   ctx.font = "20px Arial";
-  ctx.fillText("Trykk for highscore", canvas.width / 2, 180);
+  ctx.fillText("Raak vir 'n hoë telling", canvas.width / 2, 180);
 
   // Vis highscore-listen først etter brukertrykk
-  if (showHighscores) {
-    // 👇 Vis highscore-listen hvis tilgjengelig
-    if (highscoreList.length > 0) {
-      let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-      let lineHeight = fontSize * 1.4;
-      ctx.font = `${fontSize}px Arial`;
-      ctx.fillStyle = "white";
-      ctx.textAlign = "left";
-      ctx.fillText("Topp 10 Highscores:", 50, 230);
-      highscoreList.forEach((entry, i) => {
-        const y = 230 + lineHeight * (i + 1);
-        ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
-      });
-    } else {
-      loadHighscores();
-    }
+  if (showHighscores && highscoreList.length > 0) {
+  let fontSize = Math.max(12, Math.floor(canvas.height * 0.018));
+  let lineHeight = fontSize * 2;
+  let imgSize = fontSize * 2; // lite bilde
+
+  // Justerte kolonnebredder for mobil:
+  let xImg = 10;                       // bilde starter nær venstre kant
+  let xName = xImg + imgSize + 6;      // navn rett etter bilde
+  let xScore = xName + 250;             // poeng (kort navn gir plass)
+  let xLevel = xScore + 100;            // level
+  let xDate = xLevel + 100;             // dato
+  let yStart = 230;
+
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = "white";
+  ctx.textAlign = "left";
+  // Kolonneoverskrifter
+  ctx.fillText(" ", xImg, yStart); // bilde
+  ctx.fillText("Naam", xName, yStart);
+  ctx.fillText("Punte", xScore, yStart);
+  ctx.fillText("Lvl", xLevel, yStart);
+  ctx.fillText("Datum", xDate, yStart);
+
+  ctx.font = `${fontSize}px Arial`;
+
+  highscoreList.forEach((entry, i) => {
+  const y = yStart + lineHeight * (i + 1);
+  const textYOffset = imgSize / 1.3; // Juster denne for å sentrere teksten med bildet
+
+  // Karakterbilde
+  let img = new Image();
+  img.src = entry.character || "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+  if (img.complete) {
+    ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
+  } else {
+    img.onload = () => ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
   }
+
+  // Navn
+  ctx.fillText(entry.name, xName, y + textYOffset - imgSize + fontSize);
+
+  // Poeng
+  ctx.fillText(entry.score, xScore, y + textYOffset - imgSize + fontSize);
+
+  // Level
+  ctx.fillText(entry.level || 1, xLevel, y + textYOffset - imgSize + fontSize);
+
+  // Dato
+  let dateStr = "";
+  if (entry.timestamp) {
+    let dateObj;
+    if (typeof entry.timestamp === "object" && entry.timestamp.seconds) {
+      dateObj = new Date(entry.timestamp.seconds * 1000);
+    } else {
+      dateObj = new Date(entry.timestamp);
+    }
+    dateStr = dateObj.toLocaleDateString();
+  }
+  ctx.fillText(dateStr, xDate, y + textYOffset - imgSize + fontSize);
+});
+}
 
   requestAnimationFrame(draw);
   return;
@@ -988,7 +1059,7 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
     ctx.fillStyle = "red";
     ctx.font = "40px Arial";
     ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    ctx.fillText("SPEL VERBY!", canvas.width / 2, canvas.height / 2);
     ctx.font = "20px Arial";
     ctx.fillStyle = "white";
     ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
@@ -1003,6 +1074,7 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
         name: trimmed,
         score,
         level: currentLevel, // <-- legg til dette feltet
+        character: selectedCharacter,
         timestamp: Date.now()
     });
       loadHighscores();
