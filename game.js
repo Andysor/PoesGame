@@ -743,7 +743,7 @@ function drawDynamicBackground() {
   if (levelBackgroundImg) {
     ctx.save();
     // Reduser lysstyrke og kontrast (juster verdiene etter behov)
-    ctx.filter = "brightness(0.3) contrast(0.3)";
+    ctx.filter = "brightness(1) contrast(1)";
     ctx.drawImage(levelBackgroundImg, 0, 0, canvas.width, canvas.height);
     ctx.filter = "none";
     ctx.restore();
