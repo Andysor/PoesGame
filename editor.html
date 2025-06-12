@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Level Editor</title>
+  <style>
+    body { background: #111; color: #fff; font-family: sans-serif; }
+    #level-editor { background:#222; color:#fff; padding:10px; }
+    canvas { display:block; margin:20px auto; border:2px solid #fff; background:#222; }
+  </style>
+</head>
+<body>
+  
+<div id="level-editor">
+  <button onclick="exportLevel()">Eksporter level</button>
+  <button onclick="clearBricks()">Tøm brett</button>
+  <span>Velg type:</span>
+  <select id="brick-type">
+    <option value="normal">Normal</option>
+    <option value="special">Special</option>
+    <option value="sausage">Sausage</option>
+    <option value="extra">Extra Ball</option>
+  </select>
+  <br>
+  <label for="bg-file">Bakgrunnsbilde (lokal fil):</label>
+<input id="bg-file" type="file" accept="image/*">
+  <!-- Nytt: Last inn level -->
+  <br>
+  <label for="level-file">Last inn level (JSON):</label>
+  <input id="level-file" type="file" accept=".json">
+</div>
+  <canvas id="editor-canvas"></canvas>
+  <script src="editor.js"></script>
+</body>
+</html>

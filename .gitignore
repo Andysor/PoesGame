@@ -1,0 +1,24 @@
+# Ignorer bilder og nivådata
+images/
+img/
+levels/
+data/levels/
+assets/
+
+# Midlertidige/redigeringsfiler
+*.psd
+*.xcf
+*.bak
+*.tmp
+
+# Systemfiler
+.DS_Store
+Thumbs.db
+
+# VS Code / Cursor editorfiler
+.vscode/
+.idea/
+
+# Node/NPM (hvis du bruker det)
+node_modules/
+dist/
