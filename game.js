@@ -7,6 +7,76 @@ let playerName = "";
 let characterChosen = false;
 let showHighscores = false;
 
+// Add speed logging function at the top
+function logBallSpeed(location) {
+  console.log(`[${location}] Ball Speed:`, getSpeedState());
+}
+
+// Add this function at the top level
+function resetBallSpeed() {
+  // Reset all speed-related variables
+  initialSpeed = BASE_INITIAL_SPEED;
+  MAX_SPEED = BASE_MAX_SPEED;
+  window.lastSpeedIncreaseTime = null;
+  window.speedMultiplier = 1;
+  
+  // Reset ball velocity and position
+  ball.dx = 0;
+  ball.dy = 0;
+  ball.x = paddle.x + paddle.width / 2;
+  ball.y = paddle.y - ball.radius;
+  
+  // Log the reset
+  logBallSpeed('resetBallSpeed');
+}
+
+function resetGameState() {
+  score = 0;
+  lives = 3;
+  currentLevel = 1;
+  extraBalls = [];
+  fallingTexts = [];
+  showHighscores = false;
+  gameOver = false;
+  gameStarted = false;
+  levelLoaded = false;
+  loadingNextLevel = false;
+  paddleHeads = 3;
+  paddle.width = paddleHeads * headUnit;
+  characterChosen = false;
+  
+  // Complete speed reset
+  resetBallSpeed();
+  
+  logBallSpeed('resetGameState');
+}
+
+function restartGame() {
+  // Reset all game state
+  resetGameState();
+  
+  // Reset speed to base values
+  resetBallSpeed();
+  
+  // Reset level to 1
+  currentLevel = 1;
+  
+  // Reset UI state
+  showHighscores = false;
+  gameOver = false;
+  
+  // Show character select screen and hide name input
+  canvas.style.display = "none";
+  document.getElementById('character-select').style.display = "block";
+  document.getElementById('name-input-container').style.display = "none";
+  
+  // Keep the existing player name
+  characterChosen = false;
+  
+  // Load level 1
+  loadLevel(currentLevel);
+}
+
 document.querySelectorAll('.char-opt').forEach(img => {
   img.addEventListener('click', function() {
     if (characterChosen) return;
@@ -15,23 +85,29 @@ document.querySelectorAll('.char-opt').forEach(img => {
     document.querySelectorAll('.char-opt').forEach(i => i.style.border = "2px solid #fff");
     this.style.border = "4px solid gold";
     document.getElementById('character-select').style.display = "none";
-    // Hvis navn allerede er satt, hopp rett til spillstart
+    
+    // If we have a player name (from previous game), skip name input
     if (playerName && playerName.length > 0) {
       document.getElementById('name-input-container').style.display = "none";
       canvas.style.display = "block";
       readyToStart = true;
       gameStarted = false;
-      currentLevel = 1;
-      loadLevel(currentLevel);
+      
+      // Reset game state first
+      resetGameState();
+      
+      // Force speed to base values
+      resetBallSpeed();
+      logBallSpeed('characterSelect');
+      
+      // Load level 1
+      loadLevel(1);
     } else {
       document.getElementById('name-input-container').style.display = "block";
       document.getElementById('player-name').focus();
     }
-    //resizeCanvas();
   });
 });
-
-
 
 // Start spill når bruker trykker på knappen eller Enter
 document.getElementById('start-btn').onclick = startGameWithName;
@@ -51,31 +127,31 @@ function startGameWithName() {
   readyToStart = true;
   gameStarted = false;
   currentLevel = 1;
-  loadLevel(currentLevel); // <-- LAST INN LEVEL 1 FRA FIL
-  // Ikke sett gameStarted = true her!
-  // Ikke start ballen her!
-
+  // Reset speed to base values before starting
+  initialSpeed = BASE_INITIAL_SPEED;
+  MAX_SPEED = BASE_MAX_SPEED;
+  loadLevel(currentLevel);
 }
-    const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
-    const PADDLE_TOUCH_OFFSET = 150; // Avstand fra touchpunkt til padelens midtpunkt
-    let extraBalls = [];
-    let showPoesklap = false;
-    let poesklapTimer = 0;
-    let pausedBallVelocity = { dx: 0, dy: 0 };
-    let levelLoaded = false;
 
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    
-    let lifeLossSound = new Audio('https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3');  // Lyd for livstap
+const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
+const PADDLE_TOUCH_OFFSET = 150; // Avstand fra touchpunkt til padelens midtpunkt
+let extraBalls = [];
+let showPoesklap = false;
+let poesklapTimer = 0;
+let pausedBallVelocity = { dx: 0, dy: 0 };
+let levelLoaded = false;
 
-    lifeLossSound.volume = 0.2; // Juster volumet for livstap-lyd
-    lifeLossSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
+const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-    const poesklapSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3");
-    poesklapSound.volume = 0.8;
-    poesklapSound.preload = "auto";
+let lifeLossSound = new Audio('https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3');  // Lyd for livstap
 
-    
+lifeLossSound.volume = 0.2; // Juster volumet for livstap-lyd
+lifeLossSound.preload = "auto"; // Forhåndsinnlading for raskere avspilling
+
+const poesklapSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3");
+poesklapSound.volume = 0.8;
+poesklapSound.preload = "auto";
+
 const hitSoundPool = Array.from({length: 20}, () => {
   const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3");
   a.volume = 0.1;
@@ -137,30 +213,15 @@ function playPoesklapSound() {
   poesklapSoundIndex = (poesklapSoundIndex + 1) % poesklapSoundPool.length;
 }
 
+const sausageImg = new Image();
+sausageImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/sausage.png";
 
-    const sausageImg = new Image();
-    sausageImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/sausage.png";
+const coinImg = new Image();
+coinImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/coin.png";
 
-    const canvas = document.getElementById('arkanoid');
-    const ctx = canvas.getContext('2d');
+const canvas = document.getElementById('arkanoid');
+const ctx = canvas.getContext('2d');
 
-function resetGameState() {
-  score = 0;
-  lives = 3;
-  currentLevel = 1;
-  extraBalls = [];
-  fallingTexts = [];
-  showHighscores = false;
-  gameOver = false;
-  gameStarted = false;
-  levelLoaded = false;
-  loadingNextLevel = false;
-  paddleHeads = 3;
-  paddle.width = paddleHeads * headUnit;
-  characterChosen = false;
-  // Nullstill evt. andre variabler du bruker
-}
-    
 function resizeCanvas() {
   // Velg ønsket aspect ratio for mobil og PC
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -201,20 +262,24 @@ canvas.addEventListener("pointerdown", (e) => {
     return;
   }
   if (gameOver && showHighscores) {
-    canvas.style.display = "none";
-    document.getElementById('character-select').style.display = "block";
-    resetGameState();
-    showHighscores = false;
-    gameOver = false;
+    restartGame();
     console.log("Til character select");
     return;
-}
+  }
   if (readyToStart && levelLoaded && !gameStarted) {
     canvas.style.display = "block";
     document.getElementById('character-select').style.display = "none";
     gameStarted = true;
-    ball.dx = initialSpeed;
-    ball.dy = -initialSpeed;
+    
+    // Reset speed timer and multiplier
+    window.lastSpeedIncreaseTime = Date.now();
+    window.speedMultiplier = 1;
+    
+    // Set initial velocity at 45 degrees
+    ball.dx = COMPONENT_SPEED;
+    ball.dy = -COMPONENT_SPEED;
+    
+    logBallSpeed('ballStart');
     return;
   }
   // Padle-styring kun hvis spillet er i gang
@@ -239,8 +304,13 @@ let maxLevelReached = false;
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
   currentLevel = levelNum;
-  updateSpeedForLevel(); // Øk fart for hvert level
-
+  
+  // Reset speed to base values before loading level
+  initialSpeed = BASE_INITIAL_SPEED;
+  MAX_SPEED = BASE_MAX_SPEED;
+  window.lastSpeedIncreaseTime = null;
+  window.speedMultiplier = 1;
+  
   return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) throw new Error("No more levels");
@@ -313,6 +383,15 @@ function loadLevel(levelNum) {
 
       maxLevelReached = false;
       levelLoaded = true;
+      
+      // Reset ball position and velocity
+      ball.x = paddle.x + paddle.width / 2;
+      ball.y = paddle.y - ball.radius;
+      ball.dx = 0;
+      ball.dy = 0;
+      
+      // Log the speed state after reset
+      logBallSpeed('loadLevel');
 
       // ...etter at bricks er satt opp og før requestAnimationFrame(draw):
       levelBackgroundImg = null;
@@ -407,7 +486,6 @@ function lightenColor(hex, factor) {
 
   return `rgb(${r},${g},${b})`;
 }
- 
 
 let paddleHeads = 3; // starter med 3
 const maxPaddleHeads = 6;
@@ -424,22 +502,47 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // Startfart og maks fart for ballen
-const BASE_INITIAL_SPEED = 1.5;
-const BASE_MAX_SPEED = 4.0;
+const BASE_INITIAL_SPEED = 5.4; // Increased from 4.5 to 5.4 (20% increase)
+const BASE_MAX_SPEED = 10.8; // Increased from 9.0 to 10.8 (20% increase)
+const COMPONENT_SPEED = BASE_INITIAL_SPEED / Math.sqrt(2);
+// Re-enable speed increases
+const SPEED_INCREASE_INTERVAL = 10000; // Every 10 seconds
+const SPEED_INCREASE_FACTOR = 1.1; // 10% increase
 
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
 
-
 function updateSpeedForLevel() {
-  const speedMultiplier = Math.pow(1.05, currentLevel - 1); // 5% økning per level
-  initialSpeed = BASE_INITIAL_SPEED * speedMultiplier;
-  MAX_SPEED = BASE_MAX_SPEED * speedMultiplier;
+  // Always use base speed, no multipliers
+  initialSpeed = BASE_INITIAL_SPEED;
+  MAX_SPEED = BASE_MAX_SPEED;
+  
+  // If the ball is moving, set its exact speed
+  if (ball.dx !== 0 || ball.dy !== 0) {
+    const angle = Math.atan2(ball.dy, ball.dx);
+    ball.dx = initialSpeed * Math.cos(angle);
+    ball.dy = initialSpeed * Math.sin(angle);
+  }
+  
+  // Reset speed timer and multiplier
+  window.lastSpeedIncreaseTime = null;
+  window.speedMultiplier = 1;
+  
+  logBallSpeed('updateSpeedForLevel');
 }
 
 function resetSpeed() {
-  ball.dx = initialSpeed;
-  ball.dy = -initialSpeed;
+  // Reset to base speed
+  initialSpeed = BASE_INITIAL_SPEED;
+  MAX_SPEED = BASE_MAX_SPEED;
+  window.lastSpeedIncreaseTime = null;
+  window.speedMultiplier = 1;
+  
+  // Set initial velocity at 45 degrees
+  ball.dx = COMPONENT_SPEED;
+  ball.dy = -COMPONENT_SPEED;
+  
+  logBallSpeed('resetSpeed');
 }
 
 // Maksimalt hastighetsforhold for ballen
@@ -498,14 +601,22 @@ function getCanvasY(touch) {
 
     document.addEventListener("keydown", e => {
       if (e.key === "r" && gameOver) {
-        document.location.reload();
+        restartGame();
+        return;
       }
-      if (e.code === "Space" && !gameStarted) 
       if (readyToStart && levelLoaded && !gameStarted && (e.code === "Space" || e.key === " ")) {
-  gameStarted = true;
-  ball.dx = initialSpeed;
-  ball.dy = -initialSpeed;
-}
+        gameStarted = true;
+        
+        // Reset speed timer and multiplier
+        window.lastSpeedIncreaseTime = Date.now();
+        window.speedMultiplier = 1;
+        
+        // Set initial velocity at 45 degrees
+        ball.dx = COMPONENT_SPEED;
+        ball.dy = -COMPONENT_SPEED;
+        
+        logBallSpeed('ballStart');
+      }
       if (e.key === "ArrowRight") rightPressed = true;
       if (e.key === "ArrowLeft") leftPressed = true;
     });
@@ -783,6 +894,25 @@ function drawDynamicBackground() {
       return;
     }
 
+    // Tegn mynt
+    if (t.isCoin) {
+      const size = t.hit ? 20 + t.frame : 20; // Reduced from 40 to 20 (50% smaller)
+      if (coinImg.complete && coinImg.naturalWidth > 0) {
+        ctx.drawImage(coinImg, t.x - size/2, t.y - size/2, size, size);
+      } else {
+        // Fallback hvis bildet ikke er lastet
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, size/2, 0, Math.PI * 2);
+        ctx.fillStyle = "#FFD700";
+        ctx.fill();
+        ctx.strokeStyle = "#B8860B";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+
     // Tegn dødningehode
     if (t.isSkull) {
         ctx.font = t.hit ? `${60 + t.frame}px Arial` : "60px Arial";
@@ -858,6 +988,8 @@ function updateFallingTexts() {
         score += 50;
       } else if (t.isHeart) {
         lives++;
+      } else if (t.isCoin) {
+        score += 10; // Changed from 1 to 10 points for coins
       } else {
         score++;
       }
@@ -915,12 +1047,6 @@ function detectBallCollision(b) {
       if (hitX && hitY) {
         b.dy = -b.dy;
 
-        let speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
-        if (speed < MAX_SPEED) {
-          let factor = 1.02; // Øk farten med 1% for hvert treff
-          b.dx *= factor;
-          b.dy *= factor;
-        }
 
         // Poesklap pause kun for hovedball
         if (brick.extraBall && b === ball) {
@@ -957,7 +1083,7 @@ function detectBallCollision(b) {
                 isSausage: true,
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
-                speed: 2,
+                speed: 1,
                 hit: false,
                 frame: 0
             });
@@ -970,7 +1096,7 @@ function detectBallCollision(b) {
                 text: "♥",
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
-                speed: 2,
+                speed: 1,
                 color: "red",
                 blink: false,
                 hit: false,
@@ -984,7 +1110,7 @@ function detectBallCollision(b) {
               text: "☠",
               x: brick.x + brickWidth / 2,
               y: brick.y,
-              speed: 2,
+              speed: 1,
               color: "#fff",
               blink: false,
               hit: false,
@@ -1004,7 +1130,7 @@ function detectBallCollision(b) {
             text: "♥",
             x: brick.x + brickWidth / 2,
             y: brick.y,
-            speed: 2,
+            speed: 1,
             color: "red",
             blink: false,
             hit: false,
@@ -1020,38 +1146,49 @@ function detectBallCollision(b) {
             isSausage: true,
             x: brick.x + brickWidth / 2,
             y: brick.y,
-            speed: 4,
+            speed: 1,
             hit: false,
             frame: 0
         });
     } else {
     score += 1;
-    let text = "POES";
-    let color = brick.special ? "red" : "white";
-    let blink = false;
     let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
     // Kun 30% sjanse for fallingText hvis shrink/grow
     if (!isShrinkOrGrow || Math.random() < 0.3) {
         if (brick.special && brick.effect === "extend") {
-            text = "😃"; // Smilefjes for expand
-            color = "#fff";
-            blink = false;
+            fallingTexts.push({
+                text: "😃",
+                x: brick.x + brickWidth / 2,
+                y: brick.y,
+                speed: 1,
+                color: "#fff",
+                blink: false,
+                hit: false,
+                frame: 0,
+                bonus: "extend"
+            });
         } else if (brick.special && brick.effect === "shrink") {
-            text = "👺"; // Rød firkant for shrink
-            color = "#fff";
-            blink = false;
+            fallingTexts.push({
+                text: "👺",
+                x: brick.x + brickWidth / 2,
+                y: brick.y,
+                speed: 1,
+                color: "#fff",
+                blink: false,
+                hit: false,
+                frame: 0,
+                bonus: "shrink"
+            });
+        } else {
+            fallingTexts.push({
+                isCoin: true,
+                x: brick.x + brickWidth / 2,
+                y: brick.y,
+                speed: 1,
+                hit: false,
+                frame: 0
+            });
         }
-        fallingTexts.push({
-            text,
-            x: brick.x + brickWidth / 2,
-            y: brick.y,
-            speed: 2,
-            color,
-            blink,
-            hit: false,
-            frame: 0,
-            bonus: brick.effect || null
-        });
     }
 }
 }
@@ -1119,129 +1256,131 @@ function showHighscorePreview() {
   draw();
 }
 
-function startGame() {
-  if (!gameStarted) {
-    document.getElementById('character-select').style.display = "none";
-    ball.dx = initialSpeed;
-    ball.dy = -initialSpeed;
-    gameStarted = true;
-    requestAnimationFrame(draw);
-  }
-}
+// Add at the top with other constants
+const TARGET_FPS = 60;
+const FRAME_TIME = 1000 / TARGET_FPS;
+let lastFrameTime = 0;
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawDynamicBackground(); 
+// Modify the draw function to include simpler frame rate control
+function draw(currentTime) {
+  // Calculate delta time
+  if (!lastFrameTime) lastFrameTime = currentTime;
+  const deltaTime = Math.min(currentTime - lastFrameTime, 100); // Cap at 100ms to prevent huge jumps
+  lastFrameTime = currentTime;
 
-    if (showPoesklap) {
-        const elapsed = Date.now() - poesklapTimer;
-        ctx.fillStyle = elapsed % 500 < 250 ? "yellow" : "orange";
-        ctx.font = "bold 60px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
+  // Calculate movement factor based on frame time
+  const movementFactor = (deltaTime / 1000) * TARGET_FPS;
 
-  if (elapsed >= 2000) {
-    showPoesklap = false;
-    // Når du legger til en ny ekstraball:
-const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
-
-  }
-  // Ikke return! La resten av draw() kjøre videre.
-}
-
-      
-      if (gameOver) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "red";
-  ctx.font = "40px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("SPEL VERBY!", canvas.width / 2, 80);
+  drawDynamicBackground();
 
-  ctx.font = "28px Arial";
-  ctx.fillStyle = "white";
-  ctx.fillText("Score: " + score, canvas.width / 2, 130);
+  if (showPoesklap) {
+    const elapsed = Date.now() - poesklapTimer;
+    ctx.fillStyle = elapsed % 500 < 250 ? "yellow" : "orange";
+    ctx.font = "bold 60px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
 
-  ctx.font = "20px Arial";
-  ctx.fillText("Raak vir 'n hoë telling", canvas.width / 2, 180);
+    if (elapsed >= 2000) {
+      showPoesklap = false;
+      // Når du legger til en ny ekstraball:
+      const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+      const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
 
-  // Vis highscore-listen først etter brukertrykk
-  if (showHighscores && highscoreList.length > 0) {
-  let fontSize = Math.max(12, Math.floor(canvas.height * 0.018));
-  let lineHeight = fontSize * 2;
-  let imgSize = fontSize * 2; // lite bilde
-
-  // Justerte kolonnebredder for mobil:
-  let xImg = 10;                       // bilde starter nær venstre kant
-  let xName = xImg + imgSize + 6;      // navn rett etter bilde
-  let xScore = xName + 250;             // poeng (kort navn gir plass)
-  let xLevel = xScore + 100;            // level
-  let xDate = xLevel + 100;             // dato
-  let yStart = 230;
-
-  ctx.font = `bold ${fontSize}px Arial`;
-  ctx.fillStyle = "white";
-  ctx.textAlign = "left";
-  // Kolonneoverskrifter
-  ctx.fillText(" ", xImg, yStart); // bilde
-  ctx.fillText("Naam", xName, yStart);
-  ctx.fillText("Punte", xScore, yStart);
-  ctx.fillText("Lvl", xLevel, yStart);
-  ctx.fillText("Datum", xDate, yStart);
-
-  ctx.font = `${fontSize}px Arial`;
-
-  highscoreList.forEach((entry, i) => {
-  const y = yStart + lineHeight * (i + 1);
-  const textYOffset = imgSize / 1.3; // Juster denne for å sentrere teksten med bildet
-
-  // Karakterbilde
-  let img = new Image();
-  img.src = entry.character || "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
-  if (img.complete) {
-    ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
-  } else {
-    img.onload = () => ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
-  }
-
-  // Navn
-  ctx.fillText(entry.name, xName, y + textYOffset - imgSize + fontSize);
-
-  // Poeng
-  ctx.fillText(entry.score, xScore, y + textYOffset - imgSize + fontSize);
-
-  // Level
-  ctx.fillText(entry.level || 1, xLevel, y + textYOffset - imgSize + fontSize);
-
-  // Dato
-  let dateStr = "";
-  if (entry.timestamp) {
-    let dateObj;
-    if (typeof entry.timestamp === "object" && entry.timestamp.seconds) {
-      dateObj = new Date(entry.timestamp.seconds * 1000);
-    } else {
-      dateObj = new Date(entry.timestamp);
     }
-    dateStr = dateObj.toLocaleDateString();
+    // Ikke return! La resten av draw() kjøre videre.
   }
-  ctx.fillText(dateStr, xDate, y + textYOffset - imgSize + fontSize);
-});
-}
 
-  requestAnimationFrame(draw);
-  return;
-}
-      
+  if (gameOver) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "red";
+    ctx.font = "40px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("SPEL VERBY!", canvas.width / 2, 80);
 
-      if (!gameStarted) {
-  ball.x = paddle.x + paddle.width / 2;
-  ball.y = paddle.y - ball.radius;
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText("Raak die fokken skerm", canvas.width / 2, canvas.height / 2);
-}
-// Tegn alltid disse, uansett gameStarted:
+    ctx.font = "28px Arial";
+    ctx.fillStyle = "white";
+    ctx.fillText("Score: " + score, canvas.width / 2, 130);
+
+    ctx.font = "20px Arial";
+    ctx.fillText("Raak vir 'n hoë telling", canvas.width / 2, 180);
+
+    // Vis highscore-listen først etter brukertrykk
+    if (showHighscores && highscoreList.length > 0) {
+      let fontSize = Math.max(12, Math.floor(canvas.height * 0.018));
+      let lineHeight = fontSize * 2;
+      let imgSize = fontSize * 2; // lite bilde
+
+      // Justerte kolonnebredder for mobil:
+      let xImg = 10;                       // bilde starter nær venstre kant
+      let xName = xImg + imgSize + 6;      // navn rett etter bilde
+      let xScore = xName + 250;             // poeng (kort navn gir plass)
+      let xLevel = xScore + 100;            // level
+      let xDate = xLevel + 100;             // dato
+      let yStart = 230;
+
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.fillStyle = "white";
+      ctx.textAlign = "left";
+      // Kolonneoverskrifter
+      ctx.fillText(" ", xImg, yStart); // bilde
+      ctx.fillText("Naam", xName, yStart);
+      ctx.fillText("Punte", xScore, yStart);
+      ctx.fillText("Lvl", xLevel, yStart);
+      ctx.fillText("Datum", xDate, yStart);
+
+      ctx.font = `${fontSize}px Arial`;
+
+      highscoreList.forEach((entry, i) => {
+        const y = yStart + lineHeight * (i + 1);
+        const textYOffset = imgSize / 1.3; // Juster denne for å sentrere teksten med bildet
+
+        // Karakterbilde
+        let img = new Image();
+        img.src = entry.character || "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+        if (img.complete) {
+          ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
+        } else {
+          img.onload = () => ctx.drawImage(img, xImg, y - imgSize + fontSize, imgSize, imgSize);
+        }
+
+        // Navn
+        ctx.fillText(entry.name, xName, y + textYOffset - imgSize + fontSize);
+
+        // Poeng
+        ctx.fillText(entry.score, xScore, y + textYOffset - imgSize + fontSize);
+
+        // Level
+        ctx.fillText(entry.level || 1, xLevel, y + textYOffset - imgSize + fontSize);
+
+        // Dato
+        let dateStr = "";
+        if (entry.timestamp) {
+          let dateObj;
+          if (typeof entry.timestamp === "object" && entry.timestamp.seconds) {
+            dateObj = new Date(entry.timestamp.seconds * 1000);
+          } else {
+            dateObj = new Date(entry.timestamp);
+          }
+          dateStr = dateObj.toLocaleDateString();
+        }
+        ctx.fillText(dateStr, xDate, y + textYOffset - imgSize + fontSize);
+      });
+    }
+
+    requestAnimationFrame(draw);
+    return;
+  }
+
+  if (!gameStarted) {
+    ball.x = paddle.x + paddle.width / 2;
+    ball.y = paddle.y - ball.radius;
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Raak die fokken skerm", canvas.width / 2, canvas.height / 2);
+  }
+  // Tegn alltid disse, uansett gameStarted:
   drawBricks();
   drawPaddle();
   drawBall();
@@ -1249,121 +1388,247 @@ const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
   drawFallingTexts();
 
   if (gameStarted) {
-      updateFallingTexts();
-      collisionDetection();
+    updateFallingTexts();
+    collisionDetection();
   }
-    if (!loadingNextLevel && bricks.flat().every(brick => brick.destroyed)) {
-  loadingNextLevel = true;
-  setTimeout(() => {
-    currentLevel++;
-    loadLevel(currentLevel).then(() => {
-      loadingNextLevel = false;
-    });
-  }, 2000);
-  return;
-}
-
-      if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
-        ball.dx = -ball.dx;
-      }
-      if (ball.y + ball.dy < ball.radius) {
-        ball.dy = -ball.dy;
-      } if (ball.y + ball.dy > canvas.height - ball.radius) {
-  lives--;
-  playLifeLossSound();
-  if (lives > 0) {
-    gameStarted = false;
-    ball.dx = 0;
-    ball.dy = 0;
-    resetSpeed();
-  } else {
-    ctx.fillStyle = "red";
-    ctx.font = "40px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("SPEL VERBY!", canvas.width / 2, canvas.height / 2);
-    ctx.font = "20px Arial";
-    ctx.fillStyle = "white";
-    ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
-    gameOver = true;
-    gameStarted = false;
-
-    // Lagre highscore én gang
-    const name = playerName;
-    if (name) {
-        const trimmed = name.substring(0, 10);
-        db.collection("highscores").add({
-        name: trimmed,
-        score,
-        level: currentLevel, // <-- legg til dette feltet
-        character: selectedCharacter,
-        timestamp: Date.now()
-    });
-      loadHighscores();
-    }
-
+  if (!loadingNextLevel && bricks.flat().every(brick => brick.destroyed)) {
+    loadingNextLevel = true;
+    setTimeout(() => {
+      currentLevel++;
+      loadLevel(currentLevel).then(() => {
+        loadingNextLevel = false;
+      });
+    }, 2000);
     return;
   }
-} else if (
-  ball.y + ball.dy + ball.radius >= paddle.y && // Ballen treffer eller går under padelens topp
-  ball.y + ball.dy - ball.radius <= paddle.y + paddle.height && // Ballen er ikke under padelens bunn
-  ball.x + ball.radius >= paddle.x && // Ballen treffer padelens venstre kant
-  ball.x - ball.radius <= paddle.x + paddle.width // Ballen treffer padelens høyre kant
-) {
-  // Sprett ballen
-  let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-  let speed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-  let angle = hitPoint * (Math.PI / 3); // maks ±60°
-  ball.dx = speed * Math.sin(angle);
-  ball.dy = -Math.abs(speed * Math.cos(angle));
-}
 
-      ball.x += ball.dx;
-      ball.y += ball.dy;
-
-      if (rightPressed && paddle.x < canvas.width - paddle.width) paddle.x += 2.5;
-      if (leftPressed && paddle.x > 0) paddle.x -= 2.5;
-
-      requestAnimationFrame(draw);
-
-    extraBalls.forEach(b => {
-  b.x += b.dx;
-  b.y += b.dy;
-
-  // Aktiver bouncing etter første frame
-  if (!b.canBounce) {
-    b.canBounce = true;
-  }
-
-  // Veggkollisjoner
-  if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
-  if (b.y < b.radius) b.dy *= -1;
-
-  // Treff padel (hvis aktivert)
-  if (
-  b.canBounce &&
-  b.y + b.dy + b.radius >= paddle.y &&
-  b.y + b.dy - b.radius <= paddle.y + paddle.height &&
-  b.x + b.radius >= paddle.x &&
-  b.x - b.radius <= paddle.x + paddle.width
-) {
-  const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-  const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
-  const angle = hitPoint * (Math.PI / 3);
-
-  b.dx = speed * Math.sin(angle);
-  b.dy = -Math.abs(speed * Math.cos(angle));
-}
-
-  // Fjern hvis den går under skjermen
-  if (b.y - b.radius > canvas.height) {
-    b.toRemove = true;
-  }
-});
-
-
-// Fjern baller som er ute av skjermen
-extraBalls = extraBalls.filter(b => !b.toRemove);
-
-
-
+  if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+    ball.dx = -ball.dx;
+    // Ensure minimum horizontal velocity to prevent vertical bouncing
+    const minHorizontalSpeed = initialSpeed * 0.3; // 30% of initial speed
+    const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+    if (Math.abs(ball.dx) < minHorizontalSpeed) {
+      // Adjust horizontal velocity while maintaining total speed
+      const sign = ball.dx > 0 ? 1 : -1;
+      const newDx = sign * minHorizontalSpeed;
+      const newDy = Math.sqrt(currentSpeed * currentSpeed - newDx * newDx) * (ball.dy > 0 ? 1 : -1);
+      ball.dx = newDx;
+      ball.dy = newDy;
     }
+  }
+  if (ball.y + ball.dy < ball.radius) {
+    ball.dy = -ball.dy;
+    // Add slight horizontal movement when hitting top wall
+    if (Math.abs(ball.dx) < initialSpeed * 0.2) {
+      const sign = Math.random() < 0.5 ? 1 : -1;
+      ball.dx = sign * initialSpeed * 0.2;
+    }
+  } if (ball.y + ball.dy > canvas.height - ball.radius) {
+    lives--;
+    playLifeLossSound();
+    if (lives > 0) {
+      gameStarted = false;
+      ball.dx = 0;
+      ball.dy = 0;
+      resetSpeed();
+    } else {
+      ctx.fillStyle = "red";
+      ctx.font = "40px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("SPEL VERBY!", canvas.width / 2, canvas.height / 2);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
+      gameOver = true;
+      gameStarted = false;
+
+      // Lagre highscore én gang
+      const name = playerName;
+      if (name) {
+        const trimmed = name.substring(0, 10);
+        db.collection("highscores").add({
+          name: trimmed,
+          score,
+          level: currentLevel, // <-- legg til dette feltet
+          character: selectedCharacter,
+          timestamp: Date.now()
+        });
+        loadHighscores();
+      }
+
+      return;
+    }
+  } else if (
+    ball.y + ball.dy + ball.radius >= paddle.y && // Ball hits or goes under paddle top
+    ball.y + ball.dy - ball.radius <= paddle.y + paddle.height && // Ball is not under paddle bottom
+    ball.x + ball.radius >= paddle.x && // Ball hits paddle left edge
+    ball.x - ball.radius <= paddle.x + paddle.width // Ball hits paddle right edge
+  ) {
+    // Calculate hit point relative to paddle center (-1 to 1)
+    let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+    
+    // Calculate new angle based on hit point (-60 to 60 degrees)
+    let angle = hitPoint * (Math.PI / 3);
+    
+    // Get current speed
+    let currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+    
+    // Set new velocity while maintaining speed
+    ball.dx = currentSpeed * Math.sin(angle);
+    ball.dy = -Math.abs(currentSpeed * Math.cos(angle));
+  }
+
+  // Update ball position with frame rate control
+  ball.x += ball.dx * movementFactor;
+  ball.y += ball.dy * movementFactor;
+
+  // Safety checks to keep ball within bounds
+  if (ball.x < ball.radius) {
+    ball.x = ball.radius;
+    ball.dx = Math.abs(ball.dx);
+  }
+  if (ball.x > canvas.width - ball.radius) {
+    ball.x = canvas.width - ball.radius;
+    ball.dx = -Math.abs(ball.dx);
+  }
+  if (ball.y < ball.radius) {
+    ball.y = ball.radius;
+    ball.dy = Math.abs(ball.dy);
+  }
+  if (ball.y > canvas.height - ball.radius) {
+    lives--;
+    playLifeLossSound();
+    if (lives > 0) {
+      gameStarted = false;
+      ball.dx = 0;
+      ball.dy = 0;
+      resetSpeed();
+      // Reset ball position to paddle
+      ball.x = paddle.x + paddle.width / 2;
+      ball.y = paddle.y - ball.radius;
+    } else {
+      gameOver = true;
+      gameStarted = false;
+      // ... rest of game over code ...
+    }
+  }
+
+  if (rightPressed && paddle.x < canvas.width - paddle.width) paddle.x += 2.5;
+  if (leftPressed && paddle.x > 0) paddle.x -= 2.5;
+
+  // Timer-based speed increase (2% every 10 seconds)
+  if (gameStarted && !gameOver) {
+    // Temporarily disabled speed increases
+    // Only maintain speed if the ball is moving
+    if (ball.dx !== 0 || ball.dy !== 0) {
+      maintainBallSpeed();
+    }
+  }
+
+  extraBalls.forEach(b => {
+    // Update ball position with frame rate control
+    b.x += b.dx * movementFactor;
+    b.y += b.dy * movementFactor;
+
+    // Aktiver bouncing etter første frame
+    if (!b.canBounce) {
+      b.canBounce = true;
+    }
+
+    // Veggkollisjoner
+    if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
+    if (b.y < b.radius) b.dy *= -1;
+
+    // Treff padel (hvis aktivert)
+    if (
+      b.canBounce &&
+      b.y + b.dy + b.radius >= paddle.y &&
+      b.y + b.dy - b.radius <= paddle.y + paddle.height &&
+      b.x + b.radius >= paddle.x &&
+      b.x - b.radius <= paddle.x + paddle.width
+    ) {
+      const hitPoint = (b.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+      const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+      const angle = hitPoint * (Math.PI / 3);
+
+      b.dx = speed * Math.sin(angle);
+      b.dy = -Math.abs(speed * Math.cos(angle));
+    }
+
+    // Fjern hvis den går under skjermen
+    if (b.y - b.radius > canvas.height) {
+      b.toRemove = true;
+    }
+  });
+
+  // Fjern baller som er ute av skjermen
+  extraBalls = extraBalls.filter(b => !b.toRemove);
+
+  requestAnimationFrame(draw);
+}
+
+// Modify the getSpeedState function to include multiplier information
+function getSpeedState() {
+  const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+  const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
+    Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
+  const levelMultiplier = currentLevel > 1 ? Math.pow(1.05, currentLevel - 1) : 1;
+  
+  return {
+    initialSpeed,
+    MAX_SPEED,
+    currentSpeed,
+    dx: ball.dx,
+    dy: ball.dy,
+    currentLevel,
+    timeBasedMultiplier,
+    levelMultiplier,
+    totalMultiplier: timeBasedMultiplier * levelMultiplier
+  };
+}
+
+// Modify the maintainBallSpeed function to include speed increases
+function maintainBallSpeed() {
+  // Only maintain speed if the ball is actually moving
+  if (!gameStarted || gameOver || (ball.dx === 0 && ball.dy === 0)) {
+    return;
+  }
+
+  // Calculate time-based multiplier
+  const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
+    Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
+  
+  // Calculate level-based multiplier (5% increase per level after level 1)
+  const levelMultiplier = currentLevel > 1 ? Math.pow(1.05, currentLevel - 1) : 1;
+  
+  // Calculate target speed with all multipliers
+  const targetSpeed = initialSpeed * timeBasedMultiplier * levelMultiplier;
+  
+  // Cap at MAX_SPEED
+  const finalTargetSpeed = Math.min(targetSpeed, MAX_SPEED);
+
+  const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+  
+  if (Math.abs(currentSpeed - finalTargetSpeed) > 0.01) {
+    const angle = Math.atan2(ball.dy, ball.dx);
+    ball.dx = finalTargetSpeed * Math.cos(angle);
+    ball.dy = finalTargetSpeed * Math.sin(angle);
+    logBallSpeed('maintainBallSpeed');
+  }
+}
+
+// Modify the setBallSpeed function to be more precise
+function setBallSpeed(speed) {
+  const currentAngle = Math.atan2(ball.dy, ball.dx);
+  const newDx = speed * Math.cos(currentAngle);
+  const newDy = speed * Math.sin(currentAngle);
+  
+  // Log before speed change
+  logBallSpeed('beforeSetBallSpeed');
+  
+  ball.dx = newDx;
+  ball.dy = newDy;
+  
+  // Log after speed change
+  logBallSpeed('afterSetBallSpeed');
+}
