@@ -7,6 +7,24 @@ let playerName = "";
 let characterChosen = false;
 let showHighscores = false;
 
+// Add at the top of the file, after other constants
+const GAME_VERSION = "0.1.1"; // Major.Minor.Patch
+
+// Add version display when the game loads
+window.addEventListener('load', function() {
+  const versionDisplay = document.createElement('div');
+  versionDisplay.style.position = 'fixed';
+  versionDisplay.style.bottom = '10px';
+  versionDisplay.style.right = '10px';
+  versionDisplay.style.color = '#fff';
+  versionDisplay.style.fontSize = '14px';
+  versionDisplay.style.fontFamily = 'Arial';
+  versionDisplay.style.zIndex = '100';
+  versionDisplay.style.textShadow = '1px 1px 2px rgba(0,0,0,0.5)';
+  versionDisplay.textContent = `v${GAME_VERSION}`;
+  document.body.appendChild(versionDisplay);
+});
+
 // Add speed logging function at the top
 function logBallSpeed(location) {
   console.log(`[${location}] Ball Speed:`, getSpeedState());
@@ -84,6 +102,18 @@ document.querySelectorAll('.char-opt').forEach(img => {
     selectedCharacter = this.dataset.img;
     document.querySelectorAll('.char-opt').forEach(i => i.style.border = "2px solid #fff");
     this.style.border = "4px solid gold";
+    
+    // Add version display
+    const versionDisplay = document.createElement('div');
+    versionDisplay.style.position = 'absolute';
+    versionDisplay.style.bottom = '10px';
+    versionDisplay.style.right = '10px';
+    versionDisplay.style.color = '#666';
+    versionDisplay.style.fontSize = '12px';
+    versionDisplay.style.fontFamily = 'Arial';
+    versionDisplay.textContent = `v${GAME_VERSION}`;
+    document.getElementById('character-select').appendChild(versionDisplay);
+    
     document.getElementById('character-select').style.display = "none";
     
     // If we have a player name (from previous game), skip name input
@@ -1231,21 +1261,26 @@ function drawScore() {
     const lifeSize = 40; // større kattehoder
 
     for (let i = 0; i < lives; i++) {
-    const x = canvas.width - (lifeSize + 10) * (i + 1);
-    const y = 10;
+        const x = canvas.width - (lifeSize + 10) * (i + 1);
+        const y = 10;
 
-  if (!drawScore.img) {
-    drawScore.img = new Image();
-    drawScore.img.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
-  }
+        if (!drawScore.img) {
+            drawScore.img = new Image();
+            drawScore.img.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/cat4.png";
+        }
 
-  if (drawScore.img.complete) {
-    ctx.drawImage(drawScore.img, x, y, lifeSize, lifeSize);
-  } else {
-    drawScore.img.onload = draw;
-  }
-}
+        if (drawScore.img.complete) {
+            ctx.drawImage(drawScore.img, x, y, lifeSize, lifeSize);
+        } else {
+            drawScore.img.onload = draw;
+        }
+    }
 
+    // Draw version number
+    ctx.font = "12px Arial";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.fillText(`v${GAME_VERSION}`, canvas.width - 10, 60);
 }
 
 function showHighscorePreview() {
