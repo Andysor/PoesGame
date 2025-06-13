@@ -8,7 +8,7 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.1"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.2"; // Major.Minor.Patch
 
 // Add version display when the game loads
 window.addEventListener('load', function() {
