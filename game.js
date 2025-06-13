@@ -62,6 +62,8 @@ function resetGameState() {
   paddleHeads = 3;
   paddle.width = paddleHeads * headUnit;
   characterChosen = false;
+  brannasActive = false;
+  brannasEndTime = 0;
   
   // Complete speed reset
   resetBallSpeed();
@@ -210,6 +212,14 @@ const poesklapSoundPool = Array.from({length: 2}, () => {
 });
 let poesklapSoundIndex = 0;
 
+// Add with other sound pool declarations
+const brannasSoundPool = Array.from({length: 2}, () => {
+  const a = new Audio();
+  a.volume = 0.8;
+  return a;
+});
+let brannasSoundIndex = 0;
+
 // Initialize audio on first user interaction
 function initializeAudio() {
   if (audioEnabled) return;
@@ -231,6 +241,11 @@ function initializeAudio() {
     
     poesklapSoundPool.forEach(sound => {
       sound.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3";
+      sound.load();
+    });
+
+    brannasSoundPool.forEach(sound => {
+      sound.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/brannas.mp3";
       sound.load();
     });
     
@@ -292,11 +307,26 @@ function playPoesklapSound() {
   poesklapSoundIndex = (poesklapSoundIndex + 1) % poesklapSoundPool.length;
 }
 
+// Add new function to play Brannas sound
+function playBrannasSound() {
+  if (!audioEnabled) return;
+  
+  const sound = brannasSoundPool[brannasSoundIndex];
+  sound.currentTime = 0;
+  sound.play().catch(e => {
+    console.log('Failed to play brannas sound:', e);
+  });
+  brannasSoundIndex = (brannasSoundIndex + 1) % brannasSoundPool.length;
+}
+
 const sausageImg = new Image();
 sausageImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/sausage.png";
 
 const coinImg = new Image();
 coinImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/coin.png";
+
+const brannasImg = new Image();
+brannasImg.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/images/brannas.png";
 
 const canvas = document.getElementById('arkanoid');
 const ctx = canvas.getContext('2d');
@@ -392,6 +422,19 @@ const LEVEL_BACKGROUNDS = [
 // Add at the top with other constants
 const AVAILABLE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
 
+// Add at the top with other constants
+const BRANNAS_DURATION = 5000; // 5 seconds in milliseconds
+
+// Add with other game state variables
+let brannasActive = false;
+let brannasEndTime = 0;
+
+// Add at the top with other game state variables
+let showBrannas = false;
+let brannasTimer = 0;
+
+// Add with other image declarations
+
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
   console.log('=== LEVEL LOAD START ===');
@@ -413,6 +456,8 @@ function loadLevel(levelNum) {
   gameStarted = false;
   extraBalls = [];
   fallingTexts = [];
+  brannasActive = false;
+  brannasEndTime = 0;
   
   // First try to load the specific level
   fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
@@ -461,7 +506,7 @@ function loadLevel(levelNum) {
       // Reset variables for new level
       resetLevelState();
 
-      // --- START: Only normal bricks get extraLife and hasSkull, and never both ---
+      // --- START: Powerup distribution ---
       let normalBricks = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -472,25 +517,27 @@ function loadLevel(levelNum) {
         }
       }
 
-      // Choose one random normal brick and give it extra life
+      // Shuffle normal bricks to randomize powerup placement
+      normalBricks.sort(() => Math.random() - 0.5);
+
+      // Add two Brannas powerups
+      for (let i = 0; i < 1 && normalBricks.length > 0; i++) {
+        normalBricks[0].hasBrannas = true;
+        normalBricks.splice(0, 1);
+      }
+
+      // Add one extra life
       if (normalBricks.length > 0) {
-        const idx = Math.floor(Math.random() * normalBricks.length);
-        normalBricks[idx].extraLife = true;
+        normalBricks[0].extraLife = true;
+        normalBricks.splice(0, 1);
       }
 
-      // Create skullCandidates: normal bricks without extraLife
-      let skullCandidates = normalBricks.filter(brick => !brick.extraLife);
-
-      // Add 3 skulls randomly placed on normal bricks without extraLife
-      for (let i = 0; i < 3; i++) {
-        if (skullCandidates.length > 0) {
-          const idx = Math.floor(Math.random() * skullCandidates.length);
-          const brick = skullCandidates[idx];
-          brick.hasSkull = true;
-          skullCandidates.splice(idx, 1);
-        }
+      // Add 3 skulls
+      for (let i = 0; i < 3 && normalBricks.length > 0; i++) {
+        normalBricks[0].hasSkull = true;
+        normalBricks.splice(0, 1);
       }
-      // --- END: Only normal bricks get extraLife and hasSkull, and never both ---
+      // --- END: Powerup distribution ---
 
       console.log("Number of skulls:", normalBricks.filter(b => b.hasSkull).length);
 
@@ -983,6 +1030,28 @@ function drawDynamicBackground() {
   fallingTexts.forEach(t => {
     ctx.save();
 
+    // Draw bottle
+    if (t.isBottle) {
+      const size = t.hit ? 80 + t.frame : 80; // Doubled from 40 to 80
+      if (brannasImg.complete && brannasImg.naturalWidth > 0) {
+        ctx.drawImage(brannasImg, t.x - size/2, t.y - size/2, size, size);
+      } else {
+        // Fallback if image not loaded
+        ctx.fillStyle = "#ff0000";
+        ctx.beginPath();
+        ctx.moveTo(t.x - size/2 + size * 0.3, t.y - size/2 + size * 0.2);
+        ctx.lineTo(t.x - size/2 + size * 0.7, t.y - size/2 + size * 0.2);
+        ctx.lineTo(t.x - size/2 + size * 0.8, t.y - size/2 + size * 0.4);
+        ctx.lineTo(t.x - size/2 + size * 0.8, t.y - size/2 + size * 0.8);
+        ctx.lineTo(t.x - size/2 + size * 0.2, t.y - size/2 + size * 0.8);
+        ctx.lineTo(t.x - size/2 + size * 0.2, t.y - size/2 + size * 0.4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+
     // Tegn pølsebonus som bilde
     if (t.isSausage) {
       const imgW = 40, imgH = 24;
@@ -1077,7 +1146,13 @@ function updateFallingTexts() {
       t.hit = true;
       t.frame = 0; // start animasjon
 
-      if (t.isSkull) {
+      if (t.isBottle) {
+        brannasActive = true;
+        brannasEndTime = Date.now() + BRANNAS_DURATION;
+        showBrannas = true;
+        brannasTimer = Date.now();
+        playBrannasSound();
+      } else if (t.isSkull) {
         lives--;
         playLifeLossSound();
         gameStarted = false;
@@ -1091,7 +1166,7 @@ function updateFallingTexts() {
       } else if (t.isHeart) {
         lives++;
       } else if (t.isCoin) {
-        score += 10; // Changed from 1 to 10 points for coins
+        score += 10;
       } else {
         score++;
       }
@@ -1172,26 +1247,30 @@ function detectBallCollision(b) {
         // Update the last hit time
         lastHitTimes[brickKey] = now;
 
-        console.log('Collision detected:', {
-          isMainBall: b === ball,
-          brickType: brick.type,
-          brickStrength: brick.strength,
-          isExtraBall: brick.extraBall,
-          brickX: brick.x,
-          brickY: brick.y,
-          ballX: b.x,
-          ballY: b.y
-        });
+        // Handle Brannas powerup
+        if (brick.hasBrannas) {
+          fallingTexts.push({
+            isBottle: true,
+            x: brick.x + brickWidth / 2,
+            y: brick.y,
+            speed: 1,
+            hit: false,
+            frame: 0
+          });
+        }
 
-        // Determine which side of the brick was hit
-        const overlapX = b.radius - Math.abs(distanceX);
-        const overlapY = b.radius - Math.abs(distanceY);
+        // Only bounce if Brannas is not active
+        if (!brannasActive) {
+          // Determine which side of the brick was hit
+          const overlapX = b.radius - Math.abs(distanceX);
+          const overlapY = b.radius - Math.abs(distanceY);
 
-        // Bounce based on which side had the smaller overlap
-        if (overlapX < overlapY) {
-          b.dx = -b.dx;
-        } else {
-          b.dy = -b.dy;
+          // Bounce based on which side had the smaller overlap
+          if (overlapX < overlapY) {
+            b.dx = -b.dx;
+          } else {
+            b.dy = -b.dy;
+          }
         }
 
         // Handle powerups and brick destruction
@@ -1216,15 +1295,9 @@ function detectBallCollision(b) {
         // Decrease strength for all blocks
         if (brick.strength > 0) {
           brick.strength--;
-          console.log('Brick hit, new strength:', brick.strength);
           
           if (brick.strength <= 0) {
             brick.destroyed = true;
-            console.log('Brick destroyed:', {
-              isMainBall: b === ball,
-              brickType: brick.type,
-              isExtraBall: brick.extraBall
-            });
 
             // Handle scoring and powerups
             if (brick.type === "normal") {
@@ -1428,9 +1501,22 @@ function draw(currentTime) {
     ctx.textAlign = "center";
     ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
 
-    // Keep the effect visible for 2 seconds
-    if (elapsed >= 2000) {
+    // Keep the effect visible for 1 second
+    if (elapsed >= 1000) {
       showPoesklap = false;
+    }
+  }
+
+  if (showBrannas) {
+    const elapsed = Date.now() - brannasTimer;
+    ctx.fillStyle = elapsed % 500 < 250 ? "#ff0000" : "#cc0000"; // Alternating between bright and dark red
+    ctx.font = "bold 60px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("BRANNAS!", canvas.width / 2, canvas.height / 2 + 100); // Positioned 100px below center
+
+    // Keep the effect visible for 5 seconds
+    if (elapsed >= 5000) {
+      showBrannas = false;
     }
   }
 
@@ -1754,6 +1840,11 @@ function draw(currentTime) {
   // Fjern baller som er ute av skjermen
   extraBalls = extraBalls.filter(b => !b.toRemove);
 
+  // Check if Brannas has expired
+  if (brannasActive && Date.now() > brannasEndTime) {
+    brannasActive = false;
+  }
+
   requestAnimationFrame(draw);
 }
 
@@ -1822,3 +1913,21 @@ function setBallSpeed(speed) {
   // Log after speed change
   logBallSpeed('afterSetBallSpeed');
 }
+
+// Add to the draw function, after drawing the score
+function drawBrannasStatus() {
+  if (brannasActive) {
+    const timeLeft = Math.ceil((brannasEndTime - Date.now()) / 1000);
+    if (timeLeft <= 0) {
+      brannasActive = false;
+    } else {
+      ctx.font = "20px Arial";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#ff0000";
+      ctx.fillText(`BRANNAS: ${timeLeft}s`, canvas.width / 2, 80);
+    }
+  }
+}
+
+// Add to the draw function, after drawScore()
+drawBrannasStatus();
