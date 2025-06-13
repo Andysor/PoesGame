@@ -1,4 +1,5 @@
 // Legg til øverst i filen:
+// triggering a new version
 let levelBackgroundImg = null;
 let loadingNextLevel = false;
 let readyToStart = false;
