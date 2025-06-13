@@ -8,7 +8,7 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.4"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.5"; // Major.Minor.Patch
 
 // Add version display when the game loads
 window.addEventListener('load', function() {
@@ -401,6 +401,7 @@ function loadLevel(levelNum) {
   console.log('levelLoaded:', levelLoaded);
   
   currentLevel = levelNum;
+  loadingNextLevel = false;  // Ensure this is false when loading a new level
   
   // Reset speed to base values before loading level
   initialSpeed = BASE_INITIAL_SPEED;
@@ -443,7 +444,7 @@ function loadLevel(levelNum) {
           const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
           bricks[r][c] = {
             type: b.type || "normal",
-            destroyed: !!b.destroyed,
+            destroyed: false,  // Always start with non-destroyed bricks
             strength: b.strength !== undefined
               ? b.strength
               : (b.type === "special" ? 3 : 1),
@@ -1533,7 +1534,7 @@ function draw(currentTime) {
     updateFallingTexts();
     collisionDetection();
   }
-  if (!loadingNextLevel && bricks.flat().every(brick => brick.destroyed)) {
+  if (!loadingNextLevel && gameStarted && bricks.flat().every(brick => brick.destroyed)) {
     console.log('=== LEVEL COMPLETE ===');
     console.log('Current level:', currentLevel);
     console.log('loadingNextLevel before:', loadingNextLevel);
