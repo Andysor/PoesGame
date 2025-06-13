@@ -394,6 +394,12 @@ const AVAILABLE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
 
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
+  console.log('=== LEVEL LOAD START ===');
+  console.log('Previous level:', currentLevel);
+  console.log('Loading level:', levelNum);
+  console.log('loadingNextLevel:', loadingNextLevel);
+  console.log('levelLoaded:', levelLoaded);
+  
   currentLevel = levelNum;
   
   // Reset speed to base values before loading level
@@ -402,19 +408,28 @@ function loadLevel(levelNum) {
   window.lastSpeedIncreaseTime = null;
   window.speedMultiplier = 1;
   
+  // Reset game state
+  gameStarted = false;
+  extraBalls = [];
+  fallingTexts = [];
+  
   // First try to load the specific level
   fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) {
         // If specific level not found, use a random level
         const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
-        console.log(`Level ${levelNum} not found, using random level ${randomLevel}`);
+        console.log('Level not found, using random level:', randomLevel);
         return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${randomLevel}.json`);
       }
       return res;
     })
     .then(res => res.json())
     .then(level => {
+      console.log('Level data loaded successfully');
+      console.log('Current level after load:', currentLevel);
+      console.log('loadingNextLevel after load:', loadingNextLevel);
+      
       rows = level.length;
       cols = level[0].length;
 
@@ -487,9 +502,6 @@ function loadLevel(levelNum) {
       ball.dx = 0;
       ball.dy = 0;
       
-      // Log the speed state after reset
-      logBallSpeed('loadLevel');
-
       // Load background image
       levelBackgroundImg = null;
       const bgName = `level${currentLevel}`;
@@ -520,14 +532,14 @@ function loadLevel(levelNum) {
       }
 
       tryLoadImage(bgName);
-
+      console.log('=== LEVEL LOAD COMPLETE ===');
       requestAnimationFrame(draw);
     })
     .catch(error => {
       console.error("Error loading level:", error);
       // If there's an error, try loading a random level
       const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
-      console.log(`Error loading level ${levelNum}, trying random level ${randomLevel}`);
+      console.log('Error loading level, trying random level:', randomLevel);
       loadLevel(randomLevel);
     });
 }
@@ -1522,12 +1534,28 @@ function draw(currentTime) {
     collisionDetection();
   }
   if (!loadingNextLevel && bricks.flat().every(brick => brick.destroyed)) {
+    console.log('=== LEVEL COMPLETE ===');
+    console.log('Current level:', currentLevel);
+    console.log('loadingNextLevel before:', loadingNextLevel);
+    
     loadingNextLevel = true;
+    
+    // Stop ball movement during transition
+    ball.dx = 0;
+    ball.dy = 0;
+    extraBalls = [];
+    
+    // Store the next level number before the timeout
+    const nextLevel = currentLevel + 1;
+    console.log('Next level to load:', nextLevel);
+    
     setTimeout(() => {
-      currentLevel++;
-      loadLevel(currentLevel).then(() => {
-        loadingNextLevel = false;
-      });
+      console.log('=== LEVEL TRANSITION TIMEOUT ===');
+      console.log('Loading level:', nextLevel);
+      console.log('Current level before load:', currentLevel);
+      loadLevel(nextLevel);
+      loadingNextLevel = false;
+      console.log('loadingNextLevel after load:', loadingNextLevel);
     }, 2000);
     return;
   }
