@@ -1084,6 +1084,12 @@ function collisionDetection() {
   extraBalls.forEach(b => detectBallCollision(b));
 }
 
+// Add at the top with other constants
+const COLLISION_COOLDOWN = 100; // milliseconds between hits on the same brick
+
+// Add this object to track last hit times
+let lastHitTimes = {};
+
 function detectBallCollision(b) {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -1101,9 +1107,22 @@ function detectBallCollision(b) {
 
       // Check if ball is colliding with brick
       if (distanceSquared < (b.radius * b.radius)) {
+        // Create a unique key for this brick
+        const brickKey = `${r}-${c}`;
+        const now = Date.now();
+        
+        // Check if this brick was hit recently
+        if (lastHitTimes[brickKey] && now - lastHitTimes[brickKey] < COLLISION_COOLDOWN) {
+          continue; // Skip this collision if the brick was hit too recently
+        }
+        
+        // Update the last hit time
+        lastHitTimes[brickKey] = now;
+
         console.log('Collision detected:', {
           isMainBall: b === ball,
           brickType: brick.type,
+          brickStrength: brick.strength,
           isExtraBall: brick.extraBall,
           brickX: brick.x,
           brickY: brick.y,
@@ -1141,118 +1160,122 @@ function detectBallCollision(b) {
           });
         }
 
-        // Reduser styrke
-        brick.strength--;
-        if (brick.strength <= 0) {
-          brick.destroyed = true;
-          console.log('Brick destroyed:', {
-            isMainBall: b === ball,
-            brickType: brick.type,
-            isExtraBall: brick.extraBall
-          });
+        // Decrease strength for all blocks
+        if (brick.strength > 0) {
+          brick.strength--;
+          console.log('Brick hit, new strength:', brick.strength);
+          
+          if (brick.strength <= 0) {
+            brick.destroyed = true;
+            console.log('Brick destroyed:', {
+              isMainBall: b === ball,
+              brickType: brick.type,
+              isExtraBall: brick.extraBall
+            });
 
-          // Handle scoring and powerups
-          if (brick.type === "normal") {
-            score += 2;
+            // Handle scoring and powerups
+            if (brick.type === "normal") {
+              score += 2;
 
-            // Powerups for normal-brikker
-            if (brick.bonusScore) {
-              fallingTexts.push({
-                isSausage: true,
-                x: brick.x + brickWidth / 2,
-                y: brick.y,
-                speed: 1,
-                hit: false,
-                frame: 0
-              });
-            }
-            if (brick.extraLife) {
-              fallingTexts.push({
-                text: "♥",
-                x: brick.x + brickWidth / 2,
-                y: brick.y,
-                speed: 1,
-                color: "red",
-                blink: false,
-                hit: false,
-                frame: 0,
-                isHeart: true
-              });
-            }
-            if (brick.hasSkull) {
-              fallingTexts.push({
-                text: "☠",
-                x: brick.x + brickWidth / 2,
-                y: brick.y,
-                speed: 1,
-                color: "#fff",
-                blink: false,
-                hit: false,
-                frame: 0,
-                isSkull: true
-              });
-            }
-          } else {
-            // Handle special bricks
-            if (brick.extraLife) {
-              fallingTexts.push({
-                text: "♥",
-                x: brick.x + brickWidth / 2,
-                y: brick.y,
-                speed: 1,
-                color: "red",
-                blink: false,
-                hit: false,
-                frame: 0,
-                isHeart: true
-              });
-            } else if (brick.bonusScore) {
-              score += 50;
-              fallingTexts.push({
-                isSausage: true,
-                x: brick.x + brickWidth / 2,
-                y: brick.y,
-                speed: 1,
-                hit: false,
-                frame: 0
-              });
+              // Powerups for normal-brikker
+              if (brick.bonusScore) {
+                fallingTexts.push({
+                  isSausage: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              }
+              if (brick.extraLife) {
+                fallingTexts.push({
+                  text: "♥",
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  color: "red",
+                  blink: false,
+                  hit: false,
+                  frame: 0,
+                  isHeart: true
+                });
+              }
+              if (brick.hasSkull) {
+                fallingTexts.push({
+                  text: "☠",
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  color: "#fff",
+                  blink: false,
+                  hit: false,
+                  frame: 0,
+                  isSkull: true
+                });
+              }
             } else {
-              score += 1;
-              let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
-              if (!isShrinkOrGrow || Math.random() < 0.3) {
-                if (brick.special && brick.effect === "extend") {
-                  fallingTexts.push({
-                    text: "😃",
-                    x: brick.x + brickWidth / 2,
-                    y: brick.y,
-                    speed: 1,
-                    color: "#fff",
-                    blink: false,
-                    hit: false,
-                    frame: 0,
-                    bonus: "extend"
-                  });
-                } else if (brick.special && brick.effect === "shrink") {
-                  fallingTexts.push({
-                    text: "👺",
-                    x: brick.x + brickWidth / 2,
-                    y: brick.y,
-                    speed: 1,
-                    color: "#fff",
-                    blink: false,
-                    hit: false,
-                    frame: 0,
-                    bonus: "shrink"
-                  });
-                } else {
-                  fallingTexts.push({
-                    isCoin: true,
-                    x: brick.x + brickWidth / 2,
-                    y: brick.y,
-                    speed: 1,
-                    hit: false,
-                    frame: 0
-                  });
+              // Handle special bricks
+              if (brick.extraLife) {
+                fallingTexts.push({
+                  text: "♥",
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  color: "red",
+                  blink: false,
+                  hit: false,
+                  frame: 0,
+                  isHeart: true
+                });
+              } else if (brick.bonusScore) {
+                score += 50;
+                fallingTexts.push({
+                  isSausage: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              } else {
+                score += 1;
+                let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
+                if (!isShrinkOrGrow || Math.random() < 0.3) {
+                  if (brick.special && brick.effect === "extend") {
+                    fallingTexts.push({
+                      text: "😃",
+                      x: brick.x + brickWidth / 2,
+                      y: brick.y,
+                      speed: 1,
+                      color: "#fff",
+                      blink: false,
+                      hit: false,
+                      frame: 0,
+                      bonus: "extend"
+                    });
+                  } else if (brick.special && brick.effect === "shrink") {
+                    fallingTexts.push({
+                      text: "👺",
+                      x: brick.x + brickWidth / 2,
+                      y: brick.y,
+                      speed: 1,
+                      color: "#fff",
+                      blink: false,
+                      hit: false,
+                      frame: 0,
+                      bonus: "shrink"
+                    });
+                  } else {
+                    fallingTexts.push({
+                      isCoin: true,
+                      x: brick.x + brickWidth / 2,
+                      y: brick.y,
+                      speed: 1,
+                      hit: false,
+                      frame: 0
+                    });
+                  }
                 }
               }
             }
@@ -1570,9 +1593,6 @@ function draw(currentTime) {
       ball.dx = 0;
       ball.dy = 0;
       resetSpeed();
-      // Reset ball position to paddle
-      ball.x = paddle.x + paddle.width / 2;
-      ball.y = paddle.y - ball.radius;
     } else {
       gameOver = true;
       gameStarted = false;
