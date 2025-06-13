@@ -380,6 +380,18 @@ canvas.addEventListener("pointerdown", (e) => {
 let currentLevel = 1;
 let maxLevelReached = false;
 
+// Add at the top with other constants
+const LEVEL_BACKGROUNDS = [
+  "level1", "level2", "level3", "level4", "level5",
+  "level6", "level7", "level8", "level9", "level10",
+  "level11", "level12", "level13", "level14", "level15",
+  "level16", "level17", "level18", "level19", "level20",
+  "level21"
+];
+
+// Add at the top with other constants
+const AVAILABLE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+
 // Kall denne for å laste et level
 function loadLevel(levelNum) {
   currentLevel = levelNum;
@@ -390,11 +402,18 @@ function loadLevel(levelNum) {
   window.lastSpeedIncreaseTime = null;
   window.speedMultiplier = 1;
   
-  return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
+  // First try to load the specific level
+  fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
-      if (!res.ok) throw new Error("No more levels");
-      return res.json();
+      if (!res.ok) {
+        // If specific level not found, use a random level
+        const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
+        console.log(`Level ${levelNum} not found, using random level ${randomLevel}`);
+        return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${randomLevel}.json`);
+      }
+      return res;
     })
+    .then(res => res.json())
     .then(level => {
       rows = level.length;
       cols = level[0].length;
@@ -423,11 +442,10 @@ function loadLevel(levelNum) {
         }
       }
 
-      // Tilbakestill variabler for nytt level
+      // Reset variables for new level
       resetLevelState();
 
-      // --- START: Kun normalbrikker får extraLife og hasSkull, og aldri begge samtidig ---
-      // Finn alle normalbrikker som ikke er ødelagt
+      // --- START: Only normal bricks get extraLife and hasSkull, and never both ---
       let normalBricks = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -438,16 +456,16 @@ function loadLevel(levelNum) {
         }
       }
 
-      // Velg én tilfeldig normalbrikke og gi den ekstra liv
+      // Choose one random normal brick and give it extra life
       if (normalBricks.length > 0) {
         const idx = Math.floor(Math.random() * normalBricks.length);
         normalBricks[idx].extraLife = true;
       }
 
-      // Lag skullCandidates: normalbrikker uten extraLife
+      // Create skullCandidates: normal bricks without extraLife
       let skullCandidates = normalBricks.filter(brick => !brick.extraLife);
 
-      // Legg til 3 dødningehoder tilfeldig plassert på normalbrikker uten extraLife
+      // Add 3 skulls randomly placed on normal bricks without extraLife
       for (let i = 0; i < 3; i++) {
         if (skullCandidates.length > 0) {
           const idx = Math.floor(Math.random() * skullCandidates.length);
@@ -456,9 +474,9 @@ function loadLevel(levelNum) {
           skullCandidates.splice(idx, 1);
         }
       }
-      // --- SLUTT: Kun normalbrikker får extraLife og hasSkull, og aldri begge samtidig ---
+      // --- END: Only normal bricks get extraLife and hasSkull, and never both ---
 
-      console.log("Antall dødningehoder:", normalBricks.filter(b => b.hasSkull).length);
+      console.log("Number of skulls:", normalBricks.filter(b => b.hasSkull).length);
 
       maxLevelReached = false;
       levelLoaded = true;
@@ -472,72 +490,45 @@ function loadLevel(levelNum) {
       // Log the speed state after reset
       logBallSpeed('loadLevel');
 
-      // ...etter at bricks er satt opp og før requestAnimationFrame(draw):
+      // Load background image
       levelBackgroundImg = null;
       const bgName = `level${currentLevel}`;
       const exts = [".png", ".jpg", ".jpeg", ".webp"];
       let found = false;
-      for (let ext of exts) {
-        const img = new Image();
-        img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${bgName}${ext}`;
-        img.onload = () => {
-          if (!found) {
-            levelBackgroundImg = img;
-            found = true;
-            draw(); // Oppdater skjermen med bakgrunn
-          }
-        };
+      let attempts = 0;
+      const maxAttempts = exts.length;
+
+      function tryLoadImage(name) {
+        for (let ext of exts) {
+          const img = new Image();
+          img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${name}${ext}`;
+          img.onload = () => {
+            if (!found) {
+              levelBackgroundImg = img;
+              found = true;
+              draw();
+            }
+          };
+          img.onerror = () => {
+            attempts++;
+            if (attempts >= maxAttempts && !found) {
+              const randomLevel = LEVEL_BACKGROUNDS[Math.floor(Math.random() * LEVEL_BACKGROUNDS.length)];
+              tryLoadImage(randomLevel);
+            }
+          };
+        }
       }
 
-      requestAnimationFrame(draw); // Start draw-loopen
+      tryLoadImage(bgName);
+
+      requestAnimationFrame(draw);
     })
-    .catch(() => {
-      maxLevelReached = true;
-      gameOver = true;
-      gameStarted = false;
-
-      // Lagre highscore én gang når du har rundet spillet
-      const name = playerName;
-      if (name) {
-        const trimmed = name.substring(0, 10);
-        db.collection("highscores").add({
-          name: trimmed,
-          score,
-          level: currentLevel - 1, // Siste level fullført
-          character: selectedCharacter,
-          timestamp: Date.now()
-        });
-        loadHighscores();
-      }
-
-      // Vis "Du har rundet spillet!" eller lignende
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = "40px Arial";
-      ctx.fillStyle = "red";
-      ctx.textAlign = "center";
-      ctx.fillText("Jy is 'n GROOT POES!", canvas.width / 2, 80);
-
-      // 👇 Vis highscore-listen hvis tilgjengelig
-      if (highscoreList.length > 0) {
-        let fontSize = Math.max(16, Math.floor(canvas.height * 0.025));
-        let lineHeight = fontSize * 1.4;
-        ctx.font = `${fontSize}px Arial`;
-        ctx.fillStyle = "white";
-        ctx.textAlign = "left";
-        ctx.fillText("Topp 10 Highscores:", 50, 170);
-
-        highscoreList.forEach((entry, i) => {
-          const y = 170 + lineHeight * (i + 1);
-          ctx.fillText(`${i + 1}. ${entry.name}: ${entry.score} (Level ${entry.level || 1})`, 50, y);
-        });
-      } else {
-        loadHighscores();
-      }
-
-      // Ikke start draw-loopen her!
-      // Ikke kall requestAnimationFrame(draw);
-
-      return;
+    .catch(error => {
+      console.error("Error loading level:", error);
+      // If there's an error, try loading a random level
+      const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
+      console.log(`Error loading level ${levelNum}, trying random level ${randomLevel}`);
+      loadLevel(randomLevel);
     });
 }
 
@@ -1571,6 +1562,25 @@ function draw(currentTime) {
       ball.dy = 0;
       resetSpeed();
     } else {
+      gameOver = true;
+      gameStarted = false;
+      
+      // Save highscore
+      const name = playerName;
+      if (name) {
+        const trimmed = name.substring(0, 10);
+        db.collection("highscores").add({
+          name: trimmed,
+          score,
+          level: currentLevel,
+          character: selectedCharacter,
+          timestamp: Date.now()
+        });
+        loadHighscores();
+      }
+
+      // Show game over screen
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "red";
       ctx.font = "40px Arial";
       ctx.textAlign = "center";
@@ -1578,24 +1588,6 @@ function draw(currentTime) {
       ctx.font = "20px Arial";
       ctx.fillStyle = "white";
       ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
-      gameOver = true;
-      gameStarted = false;
-
-      // Lagre highscore én gang
-      const name = playerName;
-      if (name) {
-        const trimmed = name.substring(0, 10);
-        db.collection("highscores").add({
-          name: trimmed,
-          score,
-          level: currentLevel, // <-- legg til dette feltet
-          character: selectedCharacter,
-          timestamp: Date.now()
-        });
-        loadHighscores();
-      }
-
-      return;
     }
   } else if (
     ball.y + ball.dy + ball.radius >= paddle.y && // Ball hits or goes under paddle top
@@ -1645,7 +1637,30 @@ function draw(currentTime) {
     } else {
       gameOver = true;
       gameStarted = false;
-      // ... rest of game over code ...
+      
+      // Save highscore
+      const name = playerName;
+      if (name) {
+        const trimmed = name.substring(0, 10);
+        db.collection("highscores").add({
+          name: trimmed,
+          score,
+          level: currentLevel,
+          character: selectedCharacter,
+          timestamp: Date.now()
+        });
+        loadHighscores();
+      }
+
+      // Show game over screen
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "red";
+      ctx.font = "40px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("SPEL VERBY!", canvas.width / 2, canvas.height / 2);
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText("Press R to restart", canvas.width / 2, canvas.height / 2 + 40);
     }
   }
 
