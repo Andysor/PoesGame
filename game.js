@@ -502,12 +502,12 @@ window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // Startfart og maks fart for ballen
-const BASE_INITIAL_SPEED = 5.4; // Increased from 4.5 to 5.4 (20% increase)
-const BASE_MAX_SPEED = 10.8; // Increased from 9.0 to 10.8 (20% increase)
+const BASE_INITIAL_SPEED = 7; // Increased from 4.5 to 5.4 (20% increase)
+const BASE_MAX_SPEED = 14; // Increased from 9.0 to 10.8 (20% increase)
 const COMPONENT_SPEED = BASE_INITIAL_SPEED / Math.sqrt(2);
 // Re-enable speed increases
 const SPEED_INCREASE_INTERVAL = 10000; // Every 10 seconds
-const SPEED_INCREASE_FACTOR = 1.1; // 10% increase
+const SPEED_INCREASE_FACTOR = 1.2; // 10% increase
 
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
@@ -1041,58 +1041,84 @@ function detectBallCollision(b) {
       const brick = bricks[r][c];
       if (brick.destroyed) continue;
 
-      const hitX = b.x > brick.x && b.x < brick.x + brickWidth;
-      const hitY = b.y > brick.y && b.y < brick.y + brickHeight;
+      // Calculate the closest point on the brick to the ball
+      const closestX = Math.max(brick.x, Math.min(b.x, brick.x + brickWidth));
+      const closestY = Math.max(brick.y, Math.min(b.y, brick.y + brickHeight));
 
-      if (hitX && hitY) {
-        b.dy = -b.dy;
+      // Calculate distance between closest point and ball center
+      const distanceX = b.x - closestX;
+      const distanceY = b.y - closestY;
+      const distanceSquared = distanceX * distanceX + distanceY * distanceY;
 
+      // Check if ball is colliding with brick
+      if (distanceSquared < (b.radius * b.radius)) {
+        console.log('Collision detected:', {
+          isMainBall: b === ball,
+          brickType: brick.type,
+          isExtraBall: brick.extraBall,
+          brickX: brick.x,
+          brickY: brick.y,
+          ballX: b.x,
+          ballY: b.y
+        });
 
-        // Poesklap pause kun for hovedball
-        if (brick.extraBall && b === ball) {
+        // Determine which side of the brick was hit
+        const overlapX = b.radius - Math.abs(distanceX);
+        const overlapY = b.radius - Math.abs(distanceY);
+
+        // Bounce based on which side had the smaller overlap
+        if (overlapX < overlapY) {
+          b.dx = -b.dx;
+        } else {
+          b.dy = -b.dy;
+        }
+
+        // Handle powerups and brick destruction
+        if (brick.extraBall) {
           showPoesklap = true;
           poesklapTimer = Date.now();
           playPoesklapSound();
-          // Ikke pause ballen!
-        
-          // Legg til ekstraball fra denne blokkens posisjon
-            const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-            const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
-            extraBalls.push({
-                x: brick.x + brickWidth / 2,
-                y: brick.y + brickHeight / 2,
-                dx: mainSpeed * Math.cos(angle),
-                dy: -Math.abs(mainSpeed * Math.sin(angle)),
-                radius: 12,
-                canBounce: false
-            });
+          
+          // Create new extra ball for any ball hitting the brick
+          const currentSpeed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
+          const angle = Math.random() * Math.PI - Math.PI / 2;
+          extraBalls.push({
+            x: brick.x + brickWidth / 2,
+            y: brick.y + brickHeight / 2,
+            dx: currentSpeed * Math.cos(angle),
+            dy: -Math.abs(currentSpeed * Math.sin(angle)),
+            radius: 12,
+            canBounce: false
+          });
         }
 
         // Reduser styrke
         brick.strength--;
         if (brick.strength <= 0) {
-    brick.destroyed = true;
+          brick.destroyed = true;
+          console.log('Brick destroyed:', {
+            isMainBall: b === ball,
+            brickType: brick.type,
+            isExtraBall: brick.extraBall
+          });
 
-    // NORMAL: Ingen fallingText, men kan ha powerup, og gir 2 poeng
-    if (brick.type === "normal") {
-        score += 2;
+          // Handle scoring and powerups
+          if (brick.type === "normal") {
+            score += 2;
 
-        // Powerups for normal-brikker
-        if (brick.bonusScore) {
-            fallingTexts.push({
+            // Powerups for normal-brikker
+            if (brick.bonusScore) {
+              fallingTexts.push({
                 isSausage: true,
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
                 speed: 1,
                 hit: false,
                 frame: 0
-            });
-        }
-        if (brick.extraBall) {
-            // Ekstra ball håndteres allerede i ball-collision over
-        }
-        if (brick.extraLife) {
-            fallingTexts.push({
+              });
+            }
+            if (brick.extraLife) {
+              fallingTexts.push({
                 text: "♥",
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
@@ -1102,62 +1128,11 @@ function detectBallCollision(b) {
                 hit: false,
                 frame: 0,
                 isHeart: true
-            });
-        }
-
-        if (brick.hasSkull) {
-            fallingTexts.push({
-              text: "☠",
-              x: brick.x + brickWidth / 2,
-              y: brick.y,
-              speed: 1,
-              color: "#fff",
-              blink: false,
-              hit: false,
-              frame: 0,
-              isSkull: true
-            });
-        }
-
-
-        return; // Ikke lag fallingText for normal
-    }
-
-    // SPECIAL, SAUSAGE, EXTRA BALL: FallingText som før
-    // Hvis brikken har ekstra liv, lag KUN hjerte fallingText
-    if (brick.extraLife) {
-        fallingTexts.push({
-            text: "♥",
-            x: brick.x + brickWidth / 2,
-            y: brick.y,
-            speed: 1,
-            color: "red",
-            blink: false,
-            hit: false,
-            frame: 0,
-            isHeart: true
-        });
-    } 
-    
-    // Hvis brikken har dødningehode, lag skull fallingText
-     else if (brick.bonusScore) {
-        score += 50;
-        fallingTexts.push({
-            isSausage: true,
-            x: brick.x + brickWidth / 2,
-            y: brick.y,
-            speed: 1,
-            hit: false,
-            frame: 0
-        });
-    } else {
-    score += 1;
-    let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
-    // Kun 30% sjanse for fallingText hvis shrink/grow
-    if (!isShrinkOrGrow || Math.random() < 0.3) {
-        if (brick.special && brick.effect === "extend") {
-            fallingTexts.push({
-                text: "😃",
+              });
+            }
+            if (brick.hasSkull) {
+              fallingTexts.push({
+                text: "☠",
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
                 speed: 1,
@@ -1165,33 +1140,75 @@ function detectBallCollision(b) {
                 blink: false,
                 hit: false,
                 frame: 0,
-                bonus: "extend"
-            });
-        } else if (brick.special && brick.effect === "shrink") {
-            fallingTexts.push({
-                text: "👺",
+                isSkull: true
+              });
+            }
+          } else {
+            // Handle special bricks
+            if (brick.extraLife) {
+              fallingTexts.push({
+                text: "♥",
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
                 speed: 1,
-                color: "#fff",
+                color: "red",
                 blink: false,
                 hit: false,
                 frame: 0,
-                bonus: "shrink"
-            });
-        } else {
-            fallingTexts.push({
-                isCoin: true,
+                isHeart: true
+              });
+            } else if (brick.bonusScore) {
+              score += 50;
+              fallingTexts.push({
+                isSausage: true,
                 x: brick.x + brickWidth / 2,
                 y: brick.y,
                 speed: 1,
                 hit: false,
                 frame: 0
-            });
+              });
+            } else {
+              score += 1;
+              let isShrinkOrGrow = brick.special && (brick.effect === "extend" || brick.effect === "shrink");
+              if (!isShrinkOrGrow || Math.random() < 0.3) {
+                if (brick.special && brick.effect === "extend") {
+                  fallingTexts.push({
+                    text: "😃",
+                    x: brick.x + brickWidth / 2,
+                    y: brick.y,
+                    speed: 1,
+                    color: "#fff",
+                    blink: false,
+                    hit: false,
+                    frame: 0,
+                    bonus: "extend"
+                  });
+                } else if (brick.special && brick.effect === "shrink") {
+                  fallingTexts.push({
+                    text: "👺",
+                    x: brick.x + brickWidth / 2,
+                    y: brick.y,
+                    speed: 1,
+                    color: "#fff",
+                    blink: false,
+                    hit: false,
+                    frame: 0,
+                    bonus: "shrink"
+                  });
+                } else {
+                  fallingTexts.push({
+                    isCoin: true,
+                    x: brick.x + brickWidth / 2,
+                    y: brick.y,
+                    speed: 1,
+                    hit: false,
+                    frame: 0
+                  });
+                }
+              }
+            }
+          }
         }
-    }
-}
-}
       }
     }
   }
@@ -1281,14 +1298,10 @@ function draw(currentTime) {
     ctx.textAlign = "center";
     ctx.fillText("POESKLAP!", canvas.width / 2, canvas.height / 2);
 
+    // Keep the effect visible for 2 seconds
     if (elapsed >= 2000) {
       showPoesklap = false;
-      // Når du legger til en ny ekstraball:
-      const mainSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
-      const angle = Math.random() * Math.PI - Math.PI / 2; // tilfeldig vinkel oppover
-
     }
-    // Ikke return! La resten av draw() kjøre videre.
   }
 
   if (gameOver) {
@@ -1535,9 +1548,19 @@ function draw(currentTime) {
       b.canBounce = true;
     }
 
-    // Veggkollisjoner
-    if (b.x < b.radius || b.x > canvas.width - b.radius) b.dx *= -1;
-    if (b.y < b.radius) b.dy *= -1;
+    // Veggkollisjoner med frame rate control
+    if (b.x - b.radius < 0) {
+      b.x = b.radius;
+      b.dx = Math.abs(b.dx);
+    }
+    if (b.x + b.radius > canvas.width) {
+      b.x = canvas.width - b.radius;
+      b.dx = -Math.abs(b.dx);
+    }
+    if (b.y - b.radius < 0) {
+      b.y = b.radius;
+      b.dy = Math.abs(b.dy);
+    }
 
     // Treff padel (hvis aktivert)
     if (
