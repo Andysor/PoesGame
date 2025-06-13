@@ -8,7 +8,7 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.2"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.3"; // Major.Minor.Patch
 
 // Add version display when the game loads
 window.addEventListener('load', function() {
@@ -182,64 +182,113 @@ const poesklapSound = new Audio("https://raw.githubusercontent.com/Andysor/PoesG
 poesklapSound.volume = 0.8;
 poesklapSound.preload = "auto";
 
+// Add at the top with other constants
+const POESKLAP_COOLDOWN = 500; // milliseconds between poesklap sounds
+let lastPoesklapTime = 0;
+let audioContext = null;
+let audioEnabled = false;
+
+// Create empty audio elements
 const hitSoundPool = Array.from({length: 20}, () => {
-  const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3");
+  const a = new Audio();
   a.volume = 0.1;
   return a;
 });
 let hitSoundIndex = 0;
 
-function playHitSound() {
-  const sound = hitSoundPool[hitSoundIndex];
-  sound.currentTime = 0;
-  sound.play().catch(() => {});
-  hitSoundIndex = (hitSoundIndex + 1) % hitSoundPool.length;
-}
-
 const lifeLossSoundPool = Array.from({length: 3}, () => {
-  const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3");
+  const a = new Audio();
   a.volume = 0.3;
   return a;
 });
 let lifeLossSoundIndex = 0;
 
-function playLifeLossSound() {
-  const sound = lifeLossSoundPool[lifeLossSoundIndex];
-  sound.currentTime = 0;
-  sound.play().catch(() => {});
-  lifeLossSoundIndex = (lifeLossSoundIndex + 1) % lifeLossSoundPool.length;
-}
-
-const poesklapSoundPool = Array.from({length: 3}, () => {
-  const a = new Audio("https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3");
+const poesklapSoundPool = Array.from({length: 2}, () => {
+  const a = new Audio();
   a.volume = 0.8;
   return a;
 });
 let poesklapSoundIndex = 0;
 
-function unlockAudio() {
+// Initialize audio on first user interaction
+function initializeAudio() {
+  if (audioEnabled) return;
+  
   try {
-    // Spill av og pause alle lyder for å "låse opp" dem
-    lifeLossSoundPool.forEach(a =>
-      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
-    );
-    poesklapSoundPool.forEach(a =>
-      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
-    );
-    hitSoundPool.forEach(a =>
-      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(()=>{})
-    );
-  } catch(e) {}
-  window.removeEventListener('touchstart', unlockAudio);
-  window.removeEventListener('mousedown', unlockAudio);
+    // Create AudioContext
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Load and initialize all sounds
+    hitSoundPool.forEach(sound => {
+      sound.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/beep1.mp3";
+      sound.load();
+    });
+    
+    lifeLossSoundPool.forEach(sound => {
+      sound.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/lifeloss.mp3";
+      sound.load();
+    });
+    
+    poesklapSoundPool.forEach(sound => {
+      sound.src = "https://raw.githubusercontent.com/Andysor/PoesGame/main/sound/poesklap.mp3";
+      sound.load();
+    });
+    
+    audioEnabled = true;
+    console.log('Audio initialized');
+  } catch (e) {
+    console.error('Failed to initialize audio:', e);
+  }
 }
-window.addEventListener('touchstart', unlockAudio, { once: true });
-window.addEventListener('mousedown', unlockAudio, { once: true });
+
+// Add click/touch event listeners for audio initialization
+window.addEventListener('click', initializeAudio, { once: true });
+window.addEventListener('touchstart', initializeAudio, { once: true });
+
+function playHitSound() {
+  if (!audioEnabled) return;
+  
+  const sound = hitSoundPool[hitSoundIndex];
+  sound.currentTime = 0;
+  sound.play().catch(e => {
+    console.log('Failed to play hit sound:', e);
+  });
+  hitSoundIndex = (hitSoundIndex + 1) % hitSoundPool.length;
+}
+
+function playLifeLossSound() {
+  if (!audioEnabled) return;
+  
+  const sound = lifeLossSoundPool[lifeLossSoundIndex];
+  sound.currentTime = 0;
+  sound.play().catch(e => {
+    console.log('Failed to play life loss sound:', e);
+  });
+  lifeLossSoundIndex = (lifeLossSoundIndex + 1) % lifeLossSoundPool.length;
+}
 
 function playPoesklapSound() {
+  if (!audioEnabled) return;
+  
+  const now = Date.now();
+  if (now - lastPoesklapTime < POESKLAP_COOLDOWN) {
+    return; // Skip if too soon since last poesklap
+  }
+  
+  lastPoesklapTime = now;
   const sound = poesklapSoundPool[poesklapSoundIndex];
+  
+  // Ensure we're in a playable state
+  if (sound.readyState === 0) {
+    sound.load();
+  }
+  
+  // Play the sound
   sound.currentTime = 0;
-  sound.play().catch(() => {});
+  sound.play().catch(e => {
+    console.log('Failed to play poesklap sound:', e);
+  });
+  
   poesklapSoundIndex = (poesklapSoundIndex + 1) % poesklapSoundPool.length;
 }
 
@@ -1026,7 +1075,7 @@ function updateFallingTexts() {
 
       if (t.isSkull) {
         lives--;
-        playLifeLossSound && playLifeLossSound();
+        playLifeLossSound();
         gameStarted = false;
         ball.dx = 0;
         ball.dy = 0;
