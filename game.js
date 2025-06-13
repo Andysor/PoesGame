@@ -542,6 +542,9 @@ const SPEED_INCREASE_FACTOR = 1.2; // 10% increase
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
 
+// Add with other constants at the top
+const LEVEL_SPEED_INCREASE = 0.1; // 5% increase per level
+
 function updateSpeedForLevel() {
   // Always use base speed, no multipliers
   initialSpeed = BASE_INITIAL_SPEED;
@@ -658,6 +661,16 @@ function getCanvasY(touch) {
 
 
     function drawBall() {
+  // Safety check for ball position and radius
+  if (!isFinite(ball.x) || !isFinite(ball.y) || !isFinite(ball.radius)) {
+    console.error('Invalid ball values:', ball);
+    // Reset ball to safe values
+    ball.x = paddle.x + paddle.width / 2;
+    ball.y = paddle.y - ball.radius;
+    ball.radius = 12;
+    return;
+  }
+
   // Skygge
   ctx.save();
   ctx.globalAlpha = 0.4;
@@ -692,6 +705,12 @@ function getCanvasY(touch) {
 
   // Ekstra baller (samme effekt)
   extraBalls.forEach(b => {
+    // Safety check for extra ball position and radius
+    if (!isFinite(b.x) || !isFinite(b.y) || !isFinite(b.radius)) {
+      console.error('Invalid extra ball values:', b);
+      return; // Skip this ball
+    }
+
     // Skygge
     ctx.save();
     ctx.globalAlpha = 0.3;
@@ -1630,7 +1649,7 @@ function getSpeedState() {
   const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
-  const levelMultiplier = currentLevel > 1 ? Math.pow(1.05, currentLevel - 1) : 1;
+  const levelMultiplier = currentLevel > 1 ? Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1) : 1;
   
   return {
     initialSpeed,
@@ -1656,8 +1675,8 @@ function maintainBallSpeed() {
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
   
-  // Calculate level-based multiplier (5% increase per level after level 1)
-  const levelMultiplier = currentLevel > 1 ? Math.pow(1.05, currentLevel - 1) : 1;
+  // Calculate level-based multiplier using the constant
+  const levelMultiplier = currentLevel > 1 ? Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1) : 1;
   
   // Calculate target speed with all multipliers
   const targetSpeed = initialSpeed * timeBasedMultiplier * levelMultiplier;
