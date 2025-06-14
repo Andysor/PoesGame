@@ -9,7 +9,7 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.7"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.8"; // Major.Minor.Patch
 
 // Power-up constants
 const POWERUPS_PER_LEVEL = {
@@ -30,6 +30,9 @@ const MAX_SPEED_MULTIPLIER = 3; // Maximum speed multiplier (3x base speed)
 
 let initialSpeed = BASE_INITIAL_SPEED;
 let MAX_SPEED = BASE_MAX_SPEED;
+
+const TEST_MODE = false; // Set to true to start at level 21
+
 
 // Add version display when the game loads
 window.addEventListener('load', function() {
@@ -53,17 +56,20 @@ function logBallSpeed(location) {
 
 // Add this function at the top level
 function resetBallSpeed() {
-  // Reset all speed-related variables
-  initialSpeed = BASE_INITIAL_SPEED;
-  MAX_SPEED = BASE_MAX_SPEED;
-  window.lastSpeedIncreaseTime = null;
-  window.speedMultiplier = 1;
+  // Get speeds for current level
+  const speeds = getMaxSpeedForLevel(currentLevel);
+  initialSpeed = speeds.initial;
+  MAX_SPEED = speeds.max;
   
-  // Reset ball velocity and position
-  ball.dx = 0;
-  ball.dy = 0;
-  ball.x = paddle.x + paddle.width / 2;
-  ball.y = paddle.y - ball.radius;
+  // Reset the ball speed to initial speed
+  if (ball) {
+    const angle = Math.atan2(ball.dy, ball.dx);
+    ball.dx = initialSpeed * Math.cos(angle);
+    ball.dy = initialSpeed * Math.sin(angle);
+  }
+  
+  // Reset speed increase timer
+  window.lastSpeedIncreaseTime = Date.now();
   
   // Log the reset
   logBallSpeed('resetBallSpeed');
@@ -72,7 +78,7 @@ function resetBallSpeed() {
 function resetGameState() {
   score = 0;
   lives = 3;
-  currentLevel = 1;
+  currentLevel = TEST_MODE ? 21 : 1; // Keep level 21 in test mode
   extraBalls = [];
   fallingTexts = [];
   showHighscores = false;
@@ -99,8 +105,8 @@ function restartGame() {
   // Reset speed to base values
   resetBallSpeed();
   
-  // Reset level to 1
-  currentLevel = 1;
+  // Reset level to 1 or 21 based on test mode
+  currentLevel = TEST_MODE ? 21 : 1;
   
   // Reset UI state
   showHighscores = false;
@@ -114,7 +120,7 @@ function restartGame() {
   // Keep the existing player name
   characterChosen = false;
   
-  // Load level 1
+  // Load level based on test mode
   loadLevel(currentLevel);
 }
 
@@ -180,7 +186,7 @@ function startGameWithName() {
   canvas.style.display = "block";
   readyToStart = true;
   gameStarted = false;
-  currentLevel = 1;
+  currentLevel = TEST_MODE ? 21 : 1; // Start at level 21 in test mode
   
   // Reset game state first
   resetGameState();
@@ -189,8 +195,8 @@ function startGameWithName() {
   resetBallSpeed();
   logBallSpeed('startGameWithName');
   
-  // Load level 1
-  loadLevel(1);
+  // Load level 21 in test mode
+  loadLevel(currentLevel);
 }
 
 const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
@@ -501,10 +507,14 @@ function loadLevel(levelNum) {
   fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) {
-        throw new Error('Level not found');
+        // If level doesn't exist, load a random level but keep the level counter
+        const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
+        console.log('Level not found, loading random level:', randomLevel);
+        return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${randomLevel}.json`);
       }
-      return res.json();
+      return res;
     })
+    .then(res => res.json())
     .then(level => {
       console.log('Level data loaded successfully');
       
@@ -703,13 +713,16 @@ resizeCanvas();
 // Add a maximum speed cap based on level
 function getMaxSpeedForLevel(level) {
   const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, level - 1);
-  return Math.min(BASE_MAX_SPEED * levelMultiplier, BASE_MAX_SPEED * MAX_SPEED_MULTIPLIER);
+  return {
+    initial: BASE_INITIAL_SPEED * levelMultiplier,
+    max: BASE_MAX_SPEED * levelMultiplier
+  };
 }
 
 function updateSpeedForLevel() {
   // Always use base speed, no multipliers
   initialSpeed = BASE_INITIAL_SPEED;
-  MAX_SPEED = getMaxSpeedForLevel(currentLevel);
+  MAX_SPEED = getMaxSpeedForLevel(currentLevel).max;
   
   // If the ball is moving, set its exact speed
   if (ball.dx !== 0 || ball.dy !== 0) {
@@ -1960,7 +1973,7 @@ function getSpeedState() {
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
   const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1);
-  const maxAllowedSpeed = getMaxSpeedForLevel(currentLevel);
+  const maxAllowedSpeed = getMaxSpeedForLevel(currentLevel).max;
   
   return {
     initialSpeed,
@@ -1976,7 +1989,7 @@ function getSpeedState() {
   };
 }
 
-// Modify the maintainBallSpeed function to include speed increases
+// Modify the maintainBallSpeed function to use level-based speeds
 function maintainBallSpeed() {
   if (!gameStarted || gameOver || (ball.dx === 0 && ball.dy === 0)) {
     return;
@@ -1986,17 +1999,14 @@ function maintainBallSpeed() {
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
   
-  // Calculate level-based multiplier with cap
-  const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1);
+  // Get speeds for current level
+  const speeds = getMaxSpeedForLevel(currentLevel);
   
-  // Calculate target speed with all multipliers
-  const targetSpeed = initialSpeed * timeBasedMultiplier * levelMultiplier;
+  // Calculate target speed with time multiplier
+  const targetSpeed = speeds.initial * timeBasedMultiplier;
   
-  // Get the maximum allowed speed for current level
-  const maxAllowedSpeed = getMaxSpeedForLevel(currentLevel);
-  
-  // Cap at maximum allowed speed
-  const finalTargetSpeed = Math.min(targetSpeed, maxAllowedSpeed);
+  // Cap at maximum allowed speed for level
+  const finalTargetSpeed = Math.min(targetSpeed, speeds.max);
 
   const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
   
@@ -2007,6 +2017,15 @@ function maintainBallSpeed() {
     ball.dy = finalTargetSpeed * Math.sin(angle);
     logBallSpeed('maintainBallSpeed');
   }
+}
+
+// Modify the getMaxSpeedForLevel function to be more strict
+function getMaxSpeedForLevel(level) {
+  const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, level - 1);
+  return {
+    initial: BASE_INITIAL_SPEED * levelMultiplier,
+    max: BASE_MAX_SPEED * levelMultiplier
+  };
 }
 
 // Modify the setBallSpeed function to be more precise
@@ -2042,3 +2061,4 @@ function drawBrannasStatus() {
 
 // Add to the draw function, after drawScore()
 drawBrannasStatus();
+
