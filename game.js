@@ -9,7 +9,27 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.6"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.7"; // Major.Minor.Patch
+
+// Power-up constants
+const POWERUPS_PER_LEVEL = {
+  BRANNAS: 1,     // One brannas power-up per level
+  EXTRA_LIFE: 1,  // One extra life power-up per level
+  SKULL: 3,       // Three skull power-ups per level
+  COIN: 5         // Five coin power-ups per level
+};
+
+// Speed-related constants
+const BASE_INITIAL_SPEED = 7;
+const BASE_MAX_SPEED = 14;
+const COMPONENT_SPEED = BASE_INITIAL_SPEED / Math.sqrt(2);
+const SPEED_INCREASE_INTERVAL = 10000; // Every 10 seconds
+const SPEED_INCREASE_FACTOR = 1.1; // 10% increase
+const LEVEL_SPEED_INCREASE = 0.05; // 5% increase per level
+const MAX_SPEED_MULTIPLIER = 3; // Maximum speed multiplier (3x base speed)
+
+let initialSpeed = BASE_INITIAL_SPEED;
+let MAX_SPEED = BASE_MAX_SPEED;
 
 // Add version display when the game loads
 window.addEventListener('load', function() {
@@ -157,13 +177,20 @@ function startGameWithName() {
     return;
   }
   document.getElementById('name-input-container').style.display = "none";
+  canvas.style.display = "block";
   readyToStart = true;
   gameStarted = false;
   currentLevel = 1;
+  
+  // Reset game state first
+  resetGameState();
+  
   // Reset speed to base values before starting
-  initialSpeed = BASE_INITIAL_SPEED;
-  MAX_SPEED = BASE_MAX_SPEED;
-  loadLevel(currentLevel);
+  resetBallSpeed();
+  logBallSpeed('startGameWithName');
+  
+  // Load level 1
+  loadLevel(1);
 }
 
 const PADDLE_BOTTOM_MARGIN = 250; // Avstand fra bunnen av skjermen til padelen
@@ -441,11 +468,17 @@ function loadLevel(levelNum) {
   console.log('=== LEVEL LOAD START ===');
   console.log('Previous level:', currentLevel);
   console.log('Loading level:', levelNum);
-  console.log('loadingNextLevel:', loadingNextLevel);
-  console.log('levelLoaded:', levelLoaded);
   
+  // Prevent multiple simultaneous level loads
+  if (loadingNextLevel) {
+    console.log('Level load already in progress, ignoring request');
+    return;
+  }
+  
+  loadingNextLevel = true;
+  levelLoaded = false;
+  gameStarted = false; // Ensure game is not started during load
   currentLevel = levelNum;
-  loadingNextLevel = false;  // Ensure this is false when loading a new level
   
   // Reset speed to base values before loading level
   initialSpeed = BASE_INITIAL_SPEED;
@@ -454,28 +487,26 @@ function loadLevel(levelNum) {
   window.speedMultiplier = 1;
   
   // Reset game state
-  gameStarted = false;
   extraBalls = [];
   fallingTexts = [];
   brannasActive = false;
   brannasEndTime = 0;
   
+  // Clear any existing background image
+  if (levelBackgroundImg) {
+    levelBackgroundImg = null;
+  }
+  
   // First try to load the specific level
   fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${levelNum}.json`)
     .then(res => {
       if (!res.ok) {
-        // If specific level not found, use a random level
-        const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
-        console.log('Level not found, using random level:', randomLevel);
-        return fetch(`https://raw.githubusercontent.com/Andysor/PoesGame/main/levels/level${randomLevel}.json`);
+        throw new Error('Level not found');
       }
-      return res;
+      return res.json();
     })
-    .then(res => res.json())
     .then(level => {
       console.log('Level data loaded successfully');
-      console.log('Current level after load:', currentLevel);
-      console.log('loadingNextLevel after load:', loadingNextLevel);
       
       rows = level.length;
       cols = level[0].length;
@@ -483,21 +514,88 @@ function loadLevel(levelNum) {
       brickWidth = Math.floor((canvas.width - 40 - (cols - 1) * 5) / cols);
       brickHeight = Math.floor(((canvas.height / 3) - (rows - 1) * 4) / rows);
 
+      // Create array of all possible brick positions
+      let availablePositions = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const b = level[r][c];
+          // Consider both normal and special bricks, but exclude sausage and poesklap type
+          if (b && !b.bonusScore && !b.extraBall) {
+            availablePositions.push({r, c});
+          }
+        }
+      }
+      
+      // Shuffle the positions
+      for (let i = availablePositions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availablePositions[i], availablePositions[j]] = [availablePositions[j], availablePositions[i]];
+      }
+
+      // Create power-up assignments array
+      let powerUpAssignments = [];
+      let currentIndex = 0;
+
+      // Add brannas
+      if (currentIndex < availablePositions.length) {
+        powerUpAssignments.push({type: 'brannas', position: availablePositions[currentIndex++]});
+      }
+
+      // Add extra life
+      if (currentIndex < availablePositions.length) {
+        powerUpAssignments.push({type: 'extraLife', position: availablePositions[currentIndex++]});
+      }
+
+      // Add skulls
+      for (let i = 0; i < POWERUPS_PER_LEVEL.SKULL && currentIndex < availablePositions.length; i++) {
+        powerUpAssignments.push({type: 'skull', position: availablePositions[currentIndex++]});
+      }
+
+      // Add coins
+      for (let i = 0; i < POWERUPS_PER_LEVEL.COIN && currentIndex < availablePositions.length; i++) {
+        powerUpAssignments.push({type: 'coin', position: availablePositions[currentIndex++]});
+      }
+
       bricks = [];
       for (let r = 0; r < rows; r++) {
         bricks[r] = [];
         for (let c = 0; c < cols; c++) {
           const b = level[r][c] || { type: "normal", destroyed: false, strength: 1 };
+          
+          // Initialize power-ups based on assignments
+          let extraLife = false;
+          let hasSkull = false;
+          let hasBrannas = false;
+          let hasCoin = false;
+          
+          // Assign power-ups to any brick that's not sausage or poesklap type
+          if (!b.bonusScore && !b.extraBall) {
+            const assignment = powerUpAssignments.find(a => a.position.r === r && a.position.c === c);
+            if (assignment) {
+              if (assignment.type === 'brannas') {
+                hasBrannas = true;
+              } else if (assignment.type === 'extraLife') {
+                extraLife = true;
+              } else if (assignment.type === 'skull') {
+                hasSkull = true;
+              } else if (assignment.type === 'coin') {
+                hasCoin = true;
+              }
+            }
+          }
+          
           bricks[r][c] = {
             type: b.type || "normal",
-            destroyed: false,  // Always start with non-destroyed bricks
-            strength: b.strength !== undefined
-              ? b.strength
-              : (b.type === "special" ? 3 : 1),
+            destroyed: false,
+            strength: b.strength !== undefined ? b.strength : (b.type === "special" ? 3 : 1),
             bonusScore: !!b.bonusScore,
             extraBall: !!b.extraBall,
             special: !!b.special,
             effect: b.effect || null,
+            extraLife: extraLife,
+            hasSkull: hasSkull,
+            hasBrannas: hasBrannas,
+            hasCoin: hasCoin,
             x: c * (brickWidth + 5) + 20,
             y: r * (brickHeight + 4) + 80
           };
@@ -507,52 +605,7 @@ function loadLevel(levelNum) {
       // Reset variables for new level
       resetLevelState();
 
-      // --- START: Powerup distribution ---
-      let normalBricks = [];
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const b = bricks[r][c];
-          if (!b.destroyed && b.type === "normal") {
-            normalBricks.push(b);
-          }
-        }
-      }
-
-      // Shuffle normal bricks to randomize powerup placement
-      normalBricks.sort(() => Math.random() - 0.5);
-
-      // Add two Brannas powerups
-      for (let i = 0; i < 1 && normalBricks.length > 0; i++) {
-        normalBricks[0].hasBrannas = true;
-        normalBricks.splice(0, 1);
-      }
-
-      // Add one extra life
-      if (normalBricks.length > 0) {
-        normalBricks[0].extraLife = true;
-        normalBricks.splice(0, 1);
-      }
-
-      // Add 3 skulls
-      for (let i = 0; i < 3 && normalBricks.length > 0; i++) {
-        normalBricks[0].hasSkull = true;
-        normalBricks.splice(0, 1);
-      }
-      // --- END: Powerup distribution ---
-
-      console.log("Number of skulls:", normalBricks.filter(b => b.hasSkull).length);
-
-      maxLevelReached = false;
-      levelLoaded = true;
-      
-      // Reset ball position and velocity
-      ball.x = paddle.x + paddle.width / 2;
-      ball.y = paddle.y - ball.radius;
-      ball.dx = 0;
-      ball.dy = 0;
-      
       // Load background image
-      levelBackgroundImg = null;
       const bgName = `level${currentLevel}`;
       const exts = [".png", ".jpg", ".jpeg", ".webp"];
       let found = false;
@@ -560,28 +613,44 @@ function loadLevel(levelNum) {
       const maxAttempts = exts.length;
 
       function tryLoadImage(name) {
-        for (let ext of exts) {
-          const img = new Image();
-          img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${name}${ext}`;
-          img.onload = () => {
-            if (!found) {
-              levelBackgroundImg = img;
-              found = true;
-              draw();
-            }
-          };
-          img.onerror = () => {
-            attempts++;
-            if (attempts >= maxAttempts && !found) {
-              const randomLevel = LEVEL_BACKGROUNDS[Math.floor(Math.random() * LEVEL_BACKGROUNDS.length)];
-              tryLoadImage(randomLevel);
-            }
-          };
-        }
+        return new Promise((resolve, reject) => {
+          for (let ext of exts) {
+            const img = new Image();
+            img.onload = () => {
+              if (!found) {
+                levelBackgroundImg = img;
+                found = true;
+                resolve();
+              }
+            };
+            img.onerror = () => {
+              attempts++;
+              if (attempts >= maxAttempts && !found) {
+                const randomLevel = LEVEL_BACKGROUNDS[Math.floor(Math.random() * LEVEL_BACKGROUNDS.length)];
+                tryLoadImage(randomLevel).then(resolve).catch(reject);
+              }
+            };
+            img.src = `https://raw.githubusercontent.com/Andysor/PoesGame/main/images/levels/${name}${ext}`;
+          }
+        });
       }
 
-      tryLoadImage(bgName);
+      return tryLoadImage(bgName);
+    })
+    .then(() => {
       console.log('=== LEVEL LOAD COMPLETE ===');
+      levelLoaded = true;
+      loadingNextLevel = false;
+      
+      // Reset ball position and velocity
+      ball.x = paddle.x + paddle.width / 2;
+      ball.y = paddle.y - ball.radius;
+      ball.dx = 0;
+      ball.dy = 0;
+      
+      // Ensure game is ready to start
+      readyToStart = true;
+      
       requestAnimationFrame(draw);
     })
     .catch(error => {
@@ -589,19 +658,18 @@ function loadLevel(levelNum) {
       // If there's an error, try loading a random level
       const randomLevel = AVAILABLE_LEVELS[Math.floor(Math.random() * AVAILABLE_LEVELS.length)];
       console.log('Error loading level, trying random level:', randomLevel);
+      loadingNextLevel = false; // Reset flag before retrying
       loadLevel(randomLevel);
     });
 }
 
 // Tilbakestill variabler for nytt level
 function resetLevelState() {
-  //score = 0;
-  //lives = 3;
   gameStarted = false;
   gameOver = false;
   extraBalls = [];
   fallingTexts = [];
-  // evt. annet du vil nullstille
+  readyToStart = true; // Ensure game is ready to start after level reset
 }
 
 function lightenColor(hex, factor) {
@@ -632,30 +700,23 @@ let paddle = {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// Startfart og maks fart for ballen
-const BASE_INITIAL_SPEED = 7; // Increased from 4.5 to 5.4 (20% increase)
-const BASE_MAX_SPEED = 14; // Increased from 9.0 to 10.8 (20% increase)
-const COMPONENT_SPEED = BASE_INITIAL_SPEED / Math.sqrt(2);
-// Re-enable speed increases
-const SPEED_INCREASE_INTERVAL = 10000; // Every 10 seconds
-const SPEED_INCREASE_FACTOR = 1.2; // 10% increase
-
-let initialSpeed = BASE_INITIAL_SPEED;
-let MAX_SPEED = BASE_MAX_SPEED;
-
-// Add with other constants at the top
-const LEVEL_SPEED_INCREASE = 0.1; // 5% increase per level
+// Add a maximum speed cap based on level
+function getMaxSpeedForLevel(level) {
+  const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, level - 1);
+  return Math.min(BASE_MAX_SPEED * levelMultiplier, BASE_MAX_SPEED * MAX_SPEED_MULTIPLIER);
+}
 
 function updateSpeedForLevel() {
   // Always use base speed, no multipliers
   initialSpeed = BASE_INITIAL_SPEED;
-  MAX_SPEED = BASE_MAX_SPEED;
+  MAX_SPEED = getMaxSpeedForLevel(currentLevel);
   
   // If the ball is moving, set its exact speed
   if (ball.dx !== 0 || ball.dy !== 0) {
     const angle = Math.atan2(ball.dy, ball.dx);
-    ball.dx = initialSpeed * Math.cos(angle);
-    ball.dy = initialSpeed * Math.sin(angle);
+    const speed = Math.min(initialSpeed, MAX_SPEED);
+    ball.dx = speed * Math.cos(angle);
+    ball.dy = speed * Math.sin(angle);
   }
   
   // Reset speed timer and multiplier
@@ -678,9 +739,6 @@ function resetSpeed() {
   
   logBallSpeed('resetSpeed');
 }
-
-// Maksimalt hastighetsforhold for ballen
-const MAX_SPEED_MULTIPLIER = 3;
 
 let ball = {
   x: paddle.x + paddle.width / 2,
@@ -1220,6 +1278,9 @@ const COLLISION_COOLDOWN = 100; // milliseconds between hits on the same brick
 let lastHitTimes = {};
 
 function detectBallCollision(b) {
+  // Add a small buffer to prevent multiple collisions
+  const COLLISION_BUFFER = 0.5;
+  
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const brick = bricks[r][c];
@@ -1234,31 +1295,21 @@ function detectBallCollision(b) {
       const distanceY = b.y - closestY;
       const distanceSquared = distanceX * distanceX + distanceY * distanceY;
 
-      // Check if ball is colliding with brick
-      if (distanceSquared < (b.radius * b.radius)) {
+      // Check if ball is colliding with brick (with buffer)
+      if (distanceSquared < (b.radius * b.radius) + COLLISION_BUFFER) {
         // Create a unique key for this brick
         const brickKey = `${r}-${c}`;
         const now = Date.now();
         
         // Check if this brick was hit recently
         if (lastHitTimes[brickKey] && now - lastHitTimes[brickKey] < COLLISION_COOLDOWN) {
-          continue; // Skip this collision if the brick was hit too recently
+          continue;
         }
         
         // Update the last hit time
         lastHitTimes[brickKey] = now;
 
-        // Handle Brannas powerup
-        if (brick.hasBrannas) {
-          fallingTexts.push({
-            isBottle: true,
-            x: brick.x + brickWidth / 2,
-            y: brick.y,
-            speed: 1,
-            hit: false,
-            frame: 0
-          });
-        }
+        
 
         // Only bounce if Brannas is not active
         if (!brannasActive) {
@@ -1266,11 +1317,23 @@ function detectBallCollision(b) {
           const overlapX = b.radius - Math.abs(distanceX);
           const overlapY = b.radius - Math.abs(distanceY);
 
+          // Add a small random angle variation to prevent straight vertical/horizontal bounces
+          const angleVariation = (Math.random() - 0.5) * 0.2; // ±0.1 radians
+
           // Bounce based on which side had the smaller overlap
           if (overlapX < overlapY) {
-            b.dx = -b.dx;
+            b.dx = -b.dx * (1 + angleVariation);
+            b.dy = b.dy * (1 + angleVariation);
           } else {
-            b.dy = -b.dy;
+            b.dx = b.dx * (1 + angleVariation);
+            b.dy = -b.dy * (1 + angleVariation);
+          }
+
+          // Ensure minimum horizontal velocity
+          const minHorizontalSpeed = initialSpeed * 0.3;
+          if (Math.abs(b.dx) < minHorizontalSpeed) {
+            const sign = b.dx > 0 ? 1 : -1;
+            b.dx = sign * minHorizontalSpeed;
           }
         }
 
@@ -1304,17 +1367,7 @@ function detectBallCollision(b) {
             if (brick.type === "normal") {
               score += 2;
 
-              // Powerups for normal-brikker
-              if (brick.bonusScore) {
-                fallingTexts.push({
-                  isSausage: true,
-                  x: brick.x + brickWidth / 2,
-                  y: brick.y,
-                  speed: 1,
-                  hit: false,
-                  frame: 0
-                });
-              }
+              // Handle power-ups for normal bricks
               if (brick.extraLife) {
                 fallingTexts.push({
                   text: "♥",
@@ -1327,8 +1380,16 @@ function detectBallCollision(b) {
                   frame: 0,
                   isHeart: true
                 });
-              }
-              if (brick.hasSkull) {
+              } else if (brick.hasBrannas) {
+                fallingTexts.push({
+                  isBottle: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              } else if (brick.hasSkull) {
                 fallingTexts.push({
                   text: "☠",
                   x: brick.x + brickWidth / 2,
@@ -1339,6 +1400,27 @@ function detectBallCollision(b) {
                   hit: false,
                   frame: 0,
                   isSkull: true
+                });
+              } else if (brick.hasCoin) {
+                fallingTexts.push({
+                  isCoin: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              }
+
+              // Handle bonus score for normal bricks
+              if (brick.bonusScore) {
+                fallingTexts.push({
+                  isSausage: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
                 });
               }
             } else {
@@ -1359,6 +1441,36 @@ function detectBallCollision(b) {
                 score += 50;
                 fallingTexts.push({
                   isSausage: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              } else if (brick.hasBrannas) {
+                fallingTexts.push({
+                  isBottle: true,
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  hit: false,
+                  frame: 0
+                });
+              } else if (brick.hasSkull) {
+                fallingTexts.push({
+                  text: "☠",
+                  x: brick.x + brickWidth / 2,
+                  y: brick.y,
+                  speed: 1,
+                  color: "#fff",
+                  blink: false,
+                  hit: false,
+                  frame: 0,
+                  isSkull: true
+                });
+              } else if (brick.hasCoin) {
+                fallingTexts.push({
+                  isCoin: true,
                   x: brick.x + brickWidth / 2,
                   y: brick.y,
                   speed: 1,
@@ -1392,15 +1504,6 @@ function detectBallCollision(b) {
                       hit: false,
                       frame: 0,
                       bonus: "shrink"
-                    });
-                  } else {
-                    fallingTexts.push({
-                      isCoin: true,
-                      x: brick.x + brickWidth / 2,
-                      y: brick.y,
-                      speed: 1,
-                      hit: false,
-                      frame: 0
                     });
                   }
                 }
@@ -1624,9 +1727,12 @@ function draw(currentTime) {
   if (!loadingNextLevel && gameStarted && bricks.flat().every(brick => brick.destroyed)) {
     console.log('=== LEVEL COMPLETE ===');
     console.log('Current level:', currentLevel);
-    console.log('loadingNextLevel before:', loadingNextLevel);
+    
+    // Prevent multiple level transitions
+    if (loadingNextLevel) return;
     
     loadingNextLevel = true;
+    gameStarted = false; // Stop game updates during transition
     
     // Stop ball movement during transition
     ball.dx = 0;
@@ -1637,13 +1743,12 @@ function draw(currentTime) {
     const nextLevel = currentLevel + 1;
     console.log('Next level to load:', nextLevel);
     
+    // Add a small delay to ensure current level is fully cleaned up
     setTimeout(() => {
       console.log('=== LEVEL TRANSITION TIMEOUT ===');
       console.log('Loading level:', nextLevel);
-      console.log('Current level before load:', currentLevel);
+      loadingNextLevel = false; // Reset the flag before loading next level
       loadLevel(nextLevel);
-      loadingNextLevel = false;
-      console.log('loadingNextLevel after load:', loadingNextLevel);
     }, 2000);
     return;
   }
@@ -1854,7 +1959,8 @@ function getSpeedState() {
   const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
-  const levelMultiplier = currentLevel > 1 ? Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1) : 1;
+  const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1);
+  const maxAllowedSpeed = getMaxSpeedForLevel(currentLevel);
   
   return {
     initialSpeed,
@@ -1865,13 +1971,13 @@ function getSpeedState() {
     currentLevel,
     timeBasedMultiplier,
     levelMultiplier,
+    maxAllowedSpeed,
     totalMultiplier: timeBasedMultiplier * levelMultiplier
   };
 }
 
 // Modify the maintainBallSpeed function to include speed increases
 function maintainBallSpeed() {
-  // Only maintain speed if the ball is actually moving
   if (!gameStarted || gameOver || (ball.dx === 0 && ball.dy === 0)) {
     return;
   }
@@ -1880,18 +1986,22 @@ function maintainBallSpeed() {
   const timeBasedMultiplier = window.lastSpeedIncreaseTime ? 
     Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - window.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
   
-  // Calculate level-based multiplier using the constant
-  const levelMultiplier = currentLevel > 1 ? Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1) : 1;
+  // Calculate level-based multiplier with cap
+  const levelMultiplier = Math.pow(1 + LEVEL_SPEED_INCREASE, currentLevel - 1);
   
   // Calculate target speed with all multipliers
   const targetSpeed = initialSpeed * timeBasedMultiplier * levelMultiplier;
   
-  // Cap at MAX_SPEED
-  const finalTargetSpeed = Math.min(targetSpeed, MAX_SPEED);
+  // Get the maximum allowed speed for current level
+  const maxAllowedSpeed = getMaxSpeedForLevel(currentLevel);
+  
+  // Cap at maximum allowed speed
+  const finalTargetSpeed = Math.min(targetSpeed, maxAllowedSpeed);
 
   const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
   
-  if (Math.abs(currentSpeed - finalTargetSpeed) > 0.01) {
+  // Only adjust speed if difference is significant (more than 1%)
+  if (Math.abs(currentSpeed - finalTargetSpeed) > finalTargetSpeed * 0.01) {
     const angle = Math.atan2(ball.dy, ball.dx);
     ball.dx = finalTargetSpeed * Math.cos(angle);
     ball.dy = finalTargetSpeed * Math.sin(angle);
