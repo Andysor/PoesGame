@@ -9,7 +9,7 @@ let characterChosen = false;
 let showHighscores = false;
 
 // Add at the top of the file, after other constants
-const GAME_VERSION = "0.1.8"; // Major.Minor.Patch
+const GAME_VERSION = "0.1.9"; // Major.Minor.Patch
 
 // Power-up constants
 const POWERUPS_PER_LEVEL = {
@@ -2061,4 +2061,25 @@ function drawBrannasStatus() {
 
 // Add to the draw function, after drawScore()
 drawBrannasStatus();
+
+// Add touch event prevention
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault(); // Prevent default touch behavior
+}, { passive: false });
+
+canvas.addEventListener('touchmove', function(e) {
+  e.preventDefault(); // Prevent default touch behavior
+}, { passive: false });
+
+canvas.addEventListener('touchend', function(e) {
+  e.preventDefault(); // Prevent default touch behavior
+}, { passive: false });
+
+// Also prevent text selection on the entire game container
+document.body.style.webkitTouchCallout = 'none';
+document.body.style.webkitUserSelect = 'none';
+document.body.style.khtmlUserSelect = 'none';
+document.body.style.mozUserSelect = 'none';
+document.body.style.msUserSelect = 'none';
+document.body.style.userSelect = 'none';
 
