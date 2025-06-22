@@ -84,7 +84,7 @@ export class Paddle {
         this.sprite.x = Math.max(minX, Math.min(this.sprite.x, maxX));
 
         // Bound Y
-        const minY = this.app.screen.height * 0.45;
+        const minY = this.app.screen.height * 0.55;
         const maxY = this.app.screen.height - PADDLE_BOTTOM_MARGIN;
         this.sprite.y = Math.max(minY, Math.min(this.sprite.y, maxY));
     }
