@@ -12,6 +12,10 @@ export class Ball {
         main: null,
         extra: null
     };
+    
+    // Add tracking for horizontal bounce detection
+    static horizontalBounceCount = 0;
+    static lastBounceTime = 0;
 
     static async loadTextures() {
         if (!Ball.textures.main) {
@@ -189,17 +193,42 @@ export class Ball {
         this.trail.update();
         
         // Wall collision with position correction
+        let wallBounce = false;
         if (this.graphics.x - this.radius < 0) {
             this.graphics.x = this.radius;
             this.dx = Math.abs(this.dx);
+            this.enforceMinimumVerticalVelocity();
+            wallBounce = true;
         } else if (this.graphics.x + this.radius > this.app.screen.width) {
             this.graphics.x = this.app.screen.width - this.radius;
             this.dx = -Math.abs(this.dx);
+            this.enforceMinimumVerticalVelocity();
+            wallBounce = true;
         }
         
         if (this.graphics.y - this.radius < 0) {
             this.graphics.y = this.radius;
             this.dy = Math.abs(this.dy);
+            this.enforceMinimumVerticalVelocity();
+        }
+        
+        // Safety check for horizontal bounce loops
+        if (wallBounce) {
+            const currentTime = Date.now();
+            if (currentTime - Ball.lastBounceTime < 100) { // Bounce within 100ms
+                Ball.horizontalBounceCount++;
+                if (Ball.horizontalBounceCount > 5) { // More than 5 rapid bounces
+                    console.log('🚨 Detected horizontal bounce loop - forcing vertical movement');
+                    // Force a more vertical trajectory
+                    const forcedAngle = Math.PI / 4 * (Math.random() > 0.5 ? 1 : -1);
+                    this.dx = this.speed * Math.cos(forcedAngle);
+                    this.dy = this.speed * Math.sin(forcedAngle);
+                    Ball.horizontalBounceCount = 0;
+                }
+            } else {
+                Ball.horizontalBounceCount = 1;
+            }
+            Ball.lastBounceTime = currentTime;
         }
         
         // Paddle collision with position correction
@@ -311,6 +340,17 @@ export class Ball {
         const currentSpeed = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
         this.dx = (this.dx / currentSpeed) * this.speed;
         this.dy = (this.dy / currentSpeed) * this.speed;
+        
+        // Additional check to prevent near-horizontal trajectories
+        const angle = Math.atan2(this.dy, this.dx);
+        const minVerticalAngle = Math.PI / 18; // 10 degrees - even more restrictive
+        
+        if (Math.abs(angle) < minVerticalAngle) {
+            // Force minimum vertical movement
+            const forcedAngle = minVerticalAngle * Math.sign(this.dy || 1);
+            this.dx = this.speed * Math.cos(forcedAngle);
+            this.dy = this.speed * Math.sin(forcedAngle);
+        }
     }
 
     handleWallCollision(screen) {
@@ -335,18 +375,7 @@ export class Ball {
         }
 
         if (collision) {
-            let angle = Math.atan2(this.dy, this.dx);
-            
-            if (Math.abs(angle) < Math.PI / 6) {
-                angle = Math.PI / 6 * Math.sign(angle);
-            } else if (Math.abs(angle) > Math.PI - Math.PI / 6) {
-                angle = (Math.PI - Math.PI / 6) * Math.sign(angle);
-            }
-            
-            this.dx = this.speed * Math.cos(angle);
-            this.dy = this.speed * Math.sin(angle);
-            
-            this.addRandomFactor();
+            this.enforceMinimumVerticalVelocity();
         }
     }
 
@@ -757,5 +786,32 @@ export class Ball {
         };
         
         animate();
+    }
+
+    enforceMinimumVerticalVelocity() {
+        // Calculate current angle
+        const angle = Math.atan2(this.dy, this.dx);
+        
+        // Define minimum and maximum vertical angles (in radians)
+        const minVerticalAngle = Math.PI / 12; // 15 degrees
+        const maxVerticalAngle = Math.PI - Math.PI / 12; // 165 degrees
+        
+        let newAngle = angle;
+        
+        // Check if angle is too horizontal (too close to 0 or 180 degrees)
+        if (Math.abs(angle) < minVerticalAngle) {
+            // Ball is too horizontal, force it to have minimum vertical movement
+            newAngle = minVerticalAngle * Math.sign(this.dy || 1);
+        } else if (Math.abs(angle) > maxVerticalAngle) {
+            // Ball is too horizontal in the opposite direction
+            newAngle = maxVerticalAngle * Math.sign(this.dy || 1);
+        }
+        
+        // Apply the new angle while maintaining speed
+        this.dx = this.speed * Math.cos(newAngle);
+        this.dy = this.speed * Math.sin(newAngle);
+        
+        // Add a small random factor to prevent perfect horizontal bouncing
+        this.addRandomFactor();
     }
 } 
