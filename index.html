@@ -6,17 +6,62 @@
   <title>Poes Arkanoid</title>
   <link rel="stylesheet" href="./css/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+  <script type="module" src="./js/remoteLogger.js"></script>
+  
+  <!-- Mobile Debug Console -->
+  <style>
+    #mobileDebug {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 30%;
+      background: rgba(0, 0, 0, 0.8);
+      color: #00ff00;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      overflow-y: auto;
+      z-index: 10000;
+      display: none;
+      word-wrap: break-word;
+    }
+    
+    #debugToggle {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: #ff0000;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      z-index: 10001;
+      font-size: 12px;
+    }
+    
+    .debug-error { color: #ff0000; }
+    .debug-warn { color: #ffff00; }
+    .debug-info { color: #00ffff; }
+  </style>
 </head>
 <body>
   <div id="name-input-container">
-    <h2>Enter Your Name</h2>
-    <input type="text" id="name-input" placeholder="Your name">
+    <h2>Jou fokken naam</h2>
+    <input type="text" id="name-input" placeholder="Your name" maxlength="10">
     <br>
-    <button id="start-button">Start Game</button>
+    <button id="start-button">Start speletjie</button>
+  </div>
+  
+  <!-- iOS Audio Notification -->
+  <div id="ios-audio-notice" style="display: none; position: fixed; top: 10px; left: 10px; right: 10px; background: #ff6b6b; color: white; padding: 15px; border-radius: 8px; z-index: 1000; text-align: center; font-size: 14px;">
+    <strong>🔊 Audio Notice:</strong><br>
+    Turn off silent mode to hear game sounds on iOS Safari
+    <button onclick="this.parentElement.style.display='none'" style="background: white; color: #ff6b6b; border: none; padding: 5px 10px; border-radius: 4px; margin-top: 10px; font-weight: bold;">Got it</button>
   </div>
   
   <div id="character-select">
-    <h2>Choose Your Character</h2>
+    <h2>Kies jou poes</h2>
     <div class="character-options">
       <img src="./assets/images/characters/saflag.png" class="char-opt" data-img="SAFlag" alt="South African Flag">
       <img src="./assets/images/characters/springbok.png" class="char-opt" data-img="Springbok" alt="Springbok">
@@ -25,6 +70,254 @@
       <img src="./assets/images/characters/rugbyball.png" class="char-opt" data-img="RugbyBall" alt="Rugby Ball">
     </div>
   </div>
+
+  <div id="info-page" spellcheck="false">
+    <h2>Hoe om te speel</h2>
+    
+    <!-- Navigation tabs -->
+    <div class="info-tabs">
+      <button class="tab-button active" data-tab="bricks">Bakstene</button>
+      <button class="tab-button" data-tab="powerups">Power-ups</button>
+      <button class="tab-button" data-tab="tips">Spelwenke</button>
+    </div>
+    
+    <!-- Tab content -->
+<div class="tab-content">
+  <!-- Brick Types Tab -->
+  <div id="bricks-tab" class="tab-panel active">
+    <h3>Blokkies & Donnerscore</h3>
+    <div class="brick-grid">
+      <div class="brick-item">
+        <div class="brick-preview normal"></div>
+        <div class="brick-info">
+          <h4>Normale Blokkie</h4>
+          <p class="score">Score: 10 fokken punte</p>
+          <p class="effect">Effek: Breek soos jou ma se goedkoop wig – een klap en sy’s poespad</p>
+        </div>
+      </div>
+      <div class="brick-item">
+        <div class="brick-preview glass"></div>
+        <div class="brick-info">
+          <h4>Glaspoes</h4>
+          <p class="score">Score: 5 vir eerste moer, 20 as jy haar f*k opfok</p>
+          <p class="effect">Effek: Twee klappe – net soos jy jou ma se boyfriend gee</p>
+        </div>
+      </div>
+      <div class="brick-item">
+        <div class="brick-preview strong"></div>
+        <div class="brick-info">
+          <h4>Moerse Sterk Blokkie</h4>
+          <p class="score">Score: 30 punk-ass punte</p>
+          <p class="effect">Effek: Jy kan haar nie breek nie, net Brannas kan – soos jou ma se attitude</p>
+        </div>
+      </div>
+      <div class="brick-item">
+        <div class="brick-preview extra"></div>
+        <div class="brick-info">
+          <h4>Poesklap</h4>
+          <p class="score">Score: 50, net vir lekker</p>
+          <p class="effect">Effek: So hard slaan jy die bricks dat 'n tweede ballie uit jou moeder se verlede opduik. Twee balle, dubbel die chaos. As jy nie nou wen nie, dan's jy 'n pap snoek sonder sout.</p>
+        </div>
+      </div>
+      <div class="brick-item">
+        <div class="brick-preview finishlevel"></div>
+        <div class="brick-info">
+          <h4>Klaar Fokken Maak</h4>
+          <p class="score">Score: 10 punte en ‘n middle finger</p>
+          <p class="effect">Effek: Raak hom en die vlak fokof – net soos jy het van skool</p>
+        </div>
+      </div>
+      <div class="brick-item">
+        <div class="brick-preview bigbonus"></div>
+        <div class="brick-info">
+          <h4>Bonus van Hel</h4>
+          <p class="score">Score: 1000 – ja, jou ma huil nou</p>
+          <p class="effect">Effek: 'n Skatkis van punte, maar jy sal dit steeds mors soos jou lewe</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Power-ups Tab -->
+  <div id="powerups-tab" class="tab-panel">
+    <h3>Power-ups vir Poepholle</h3>
+    <div class="powerup-grid">
+      <div class="powerup-item">
+        <div class="powerup-icon brannas"></div>
+        <div class="powerup-info">
+          <h4>Brannas</h4>
+          <p>Effek: Alles ontplof soos jou ma se mikrogolf toe sy kos met tinfoil in sit</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon extra-life"></div>
+        <div class="powerup-info">
+          <h4>Ekstra Fokken Lewe</h4>
+          <p>Effek: Jy’s terug – unlike jou pa</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon skull"></div>
+        <div class="powerup-info">
+          <h4>Doodsklap</h4>
+          <p>Effek: Jy vrek soos jou ma se hoop en drome</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon coin-gold"></div>
+        <div class="powerup-info">
+          <h4>Goue K*k</h4>
+          <p>Effek: 100 punte vir jou trash-ass siel</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon coin-silver"></div>
+        <div class="powerup-info">
+          <h4>Silwer K*k</h4>
+          <p>Effek: 50 punte – dis nie goud nie, maar dis beter as jou rapport</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon large-paddle"></div>
+        <div class="powerup-info">
+          <h4>Vet Paddle</h4>
+          <p>Effek: Paddle raak so groot soos jou ma se agterent na KFC Sondag</p>
+        </div>
+      </div>
+      <div class="powerup-item">
+        <div class="powerup-icon small-paddle"></div>
+        <div class="powerup-info">
+          <h4>Laaitie Paddle</h4>
+          <p>Effek: Raak klein soos jou selfbeeld na ‘n breakup</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gameplay Tips Tab -->
+  <div id="tips-tab" class="tab-panel">
+    <h3>Wenke (As Jy Dom is)</h3>
+    <div class="tips-content">
+      <div class="tip-item">
+        <div class="tip-icon">🎮</div>
+        <div class="tip-text">
+          <h4>Ballie Beheer</h4>
+          <p>Skuif paddle soos jy skelm jou ma se wyn bottel skuif</p>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">🔨</div>
+        <div class="tip-text">
+          <h4>Glas Drolle</h4>
+          <p>Gee hulle twee klappe – soos daai tjommie wat skuld betaal het</p>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">💪</div>
+        <div class="tip-text">
+          <h4>Sterk Moerse Drolle</h4>
+          <p>Net Brannas sorteer daai – moenie slim probeer wees nie</p>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">🎯</div>
+        <div class="tip-text">
+          <h4>Spesiale Brickie Bitchies</h4>
+          <p>Finish & Bonus blokkies? Skiet en f*k hulle op, hulle’s nie real obstacles nie</p>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">⏱️</div>
+        <div class="tip-text">
+          <h4>Tyd Bonus</h4>
+          <p>Hoe vinniger jy speel, hoe minder tyd vir jou ma om vrae te vra</p>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">⭐</div>
+        <div class="tip-text">
+          <h4>Power-ups</h4>
+          <p>Moenie daai kak los nie – gryp en raak 'n fokken legend</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    
+    <button id="start-game-button">Start Speletjie</button>
+  </div>
   <script type="module" src="./js/main.js"></script>
+  
+  <button id="debugToggle" onclick="toggleDebug()">Debug</button>
+  <div id="mobileDebug"></div>
+  
+  <script>
+    // Mobile Debug Console - now integrated with RemoteLogger
+    function toggleDebug() {
+      if (window.remoteLogger) {
+        const debugDiv = document.getElementById('mobileDebug');
+        if (debugDiv.style.display === 'none') {
+          window.remoteLogger.showHtmlDebugConsole();
+        } else {
+          window.remoteLogger.hideHtmlDebugConsole();
+        }
+      }
+    }
+    
+    // Global error handler
+    window.addEventListener('error', function(e) {
+      const errorMsg = `ERROR: ${e.message} at ${e.filename}:${e.lineno}`;
+      if (window.remoteLogger) {
+        window.remoteLogger.log(errorMsg, 'error');
+      }
+      console.error('Global error:', e);
+    });
+    
+    // Unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', function(e) {
+      const errorMsg = `PROMISE ERROR: ${e.reason}`;
+      if (window.remoteLogger) {
+        window.remoteLogger.log(errorMsg, 'error');
+      }
+      console.error('Unhandled promise rejection:', e);
+    });
+  </script>
+  
+  <!-- Debug mode check and conditional debug UI -->
+  <script type="module">
+    import { DEBUG_MODE } from './js/config.js';
+    
+    // Hide debug elements if debug mode is disabled
+    if (!DEBUG_MODE) {
+      // Remove debug button and console from DOM
+      const debugButton = document.getElementById('debugToggle');
+      const debugConsole = document.getElementById('mobileDebug');
+      if (debugButton) debugButton.remove();
+      if (debugConsole) debugConsole.remove();
+      
+      // Remove debug styles
+      const debugStyles = document.querySelector('style');
+      if (debugStyles) {
+        debugStyles.textContent = debugStyles.textContent.replace(/#mobileDebug[^}]*}/g, '');
+        debugStyles.textContent = debugStyles.textContent.replace(/#debugToggle[^}]*}/g, '');
+        debugStyles.textContent = debugStyles.textContent.replace(/\.debug-error[^}]*}/g, '');
+        debugStyles.textContent = debugStyles.textContent.replace(/\.debug-warn[^}]*}/g, '');
+        debugStyles.textContent = debugStyles.textContent.replace(/\.debug-info[^}]*}/g, '');
+      }
+    } else {
+      // Debug mode is enabled - show debug on mobile
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        console.log('📱 Mobile device detected - debug console enabled');
+        // Auto-show debug on mobile after 3 seconds
+        setTimeout(() => {
+          if (window.remoteLogger) {
+            window.remoteLogger.showHtmlDebugConsole();
+          }
+        }, 3000);
+      }
+    }
+  </script>
 </body>
 </html>
