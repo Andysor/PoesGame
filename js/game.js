@@ -217,7 +217,9 @@ export class Game {
         if (this.inputMode === 'playing' || this.inputMode === 'moving') {
             // Move paddle if in playing mode or moving mode (before launch)
             if (this.paddle && this.paddle.handlePointerMove) {
-                this.paddle.handlePointerMove(e);
+                // Pass ball movement state to control Y movement
+                const ballIsMoving = this.ball ? this.ball.isMoving : false;
+                this.paddle.handlePointerMove(e, ballIsMoving);
             }
             
             // If in moving mode and waiting for input, make ball follow paddle
@@ -246,7 +248,9 @@ export class Game {
                 
                 // Move paddle to current position
                 if (this.paddle && this.paddle.handlePointerMove) {
-                    this.paddle.handlePointerMove(e);
+                    // Pass ball movement state to control Y movement
+                    const ballIsMoving = this.ball ? this.ball.isMoving : false;
+                    this.paddle.handlePointerMove(e, ballIsMoving);
                 }
                 
                 // Make ball follow paddle immediately

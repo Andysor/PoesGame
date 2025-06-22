@@ -1,5 +1,5 @@
 // Game version
-export const GAME_VERSION = '0.1.0';
+export const GAME_VERSION = '0.1.1';
 
 // Debug mode flag - set to true to enable debug logging and features
 export const DEBUG_MODE = false;

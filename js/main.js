@@ -248,9 +248,10 @@ function setupInputHandlers() {
             
             // Move paddle and ball together
             if (game.paddle && game.paddle.handlePointerMove) {
-                game.paddle.handlePointerMove(e);
+                // Pass ball movement state to control Y movement
+                const ballIsMoving = game.ball ? game.ball.isMoving : false;
+                game.paddle.handlePointerMove(e, ballIsMoving);
             }
-            // Ball positioning is handled by ball.update() method when not moving
         }
         // Also handle pointer move for the game (for playing mode)
         if (game && game.handlePointerMove) {

@@ -49,12 +49,17 @@ export class Paddle {
         this.targetY = this.sprite.y;
     }
 
-    handlePointerMove(e) {
+    handlePointerMove(e, ballIsMoving = true) {
         this.targetX = e.global.x;
         
-       // Set Y position to hover 15% of screen height above the touch point
-        const hoverOffset = this.app.screen.height * PADDLE_HOVER_OFFSET;
-        this.targetY = e.global.y - hoverOffset;
+        // Only allow Y movement if the ball is moving (active gameplay)
+        // When ball is not moving (restarting), keep Y position fixed
+        if (ballIsMoving) {
+            // Set Y position to hover 15% of screen height above the touch point
+            const hoverOffset = this.app.screen.height * PADDLE_HOVER_OFFSET;
+            this.targetY = e.global.y - hoverOffset;
+        }
+        // If ballIsMoving is false, targetY remains unchanged, keeping the paddle at its current Y position
     }
 
     update() {
