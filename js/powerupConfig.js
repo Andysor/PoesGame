@@ -19,10 +19,10 @@ export const POWERUP_BEHAVIOR_CONFIG = {
         spriteKey: 'extraball',
         showSprite: true,
         showText: true,
-        text: 'EXTRA!',
+        text: 'POESKLAP!',
         textPosition: 'center',
-        textSize: 28,
-        textBlink: false,
+        textSize: 32,
+        textBlink: true,
         playSound: true,                   
         sound: 'extra_life',               // References asset name
         activateOn: 'brick',
