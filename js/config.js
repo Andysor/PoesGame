@@ -12,7 +12,7 @@ export const BRICK_AREA_WIDTH_PERCENT = 0.95; // 95% of screen width (reduced fr
 export const BRICK_AREA_TOP_PERCENT = 0.05; // 5% from top of screen
 
 // Ball settings - now in percentage of screen width per second
-export const BASE_INITIAL_SPEED_PERCENT = 0.4; // 80% of screen width per second
+export const BASE_INITIAL_SPEED_PERCENT = 0.8; // 80% of screen width per second
 export const BASE_MAX_SPEED_PERCENT = 2; // 200% of screen width per second
 export const LEVEL_SPEED_INCREASE = 0.06; // 20% increase per level
 export const BALL_RADIUS = window.innerWidth * 0.02; // 1% of screen width
