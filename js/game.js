@@ -11,7 +11,8 @@ import {
     getScreenRelativeSpeed,
     BASE_INITIAL_SPEED_PERCENT,
     BASE_MAX_SPEED_PERCENT,
-    TIME_BONUS_CONFIG
+    TIME_BONUS_CONFIG,
+    GAME_VERSION
 } from './config.js';
 import { Level } from './level.js';
 import { GameOverManager } from './gameOverManager.js';
@@ -45,6 +46,14 @@ export class Game {
         this.characterChosen = false;
         this.brannasActive = false;
         this.brannasEndTime = 0;
+        this.speedMultiplier = 1; // Initialize speed multiplier
+        this.speedPowerupEndTime = null; // Initialize speed powerup end time
+        this.tankModeActive = false; // Initialize tank mode
+        this.tankConfig = null; // Tank powerup configuration
+        this.aimLine = null; // Aim line graphics
+        this.shell = null; // Shell graphics
+        this.shellTrajectory = null; // Shell movement trajectory
+        this.pausedBalls = []; // Array to store paused ball states
         this.extraBalls = [];
         this.fallingTexts = [];
         this.waitingForInput = true;
@@ -117,6 +126,15 @@ export class Game {
         });
         this.levelText.position.set(app.screen.width / 2 - 50, 10);
         this.uiContainer.addChild(this.levelText);
+        
+        // Create version text
+        this.versionText = new PIXI.Text(`v${GAME_VERSION}`, {
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fill: 0x888888
+        });
+        this.versionText.position.set(10, app.screen.height - 25);
+        this.uiContainer.addChild(this.versionText);
         
         // Create game over manager
         this.gameOverManager = new GameOverManager(app);
@@ -346,8 +364,15 @@ export class Game {
             this.loadingNextLevel = false;
             this.brannasActive = false;
             this.brannasEndTime = 0;
+            this.speedMultiplier = 1; // Initialize speed multiplier
+            this.speedPowerupEndTime = null; // Initialize speed powerup end time
+            this.tankModeActive = false; // Initialize tank mode
+            this.tankConfig = null; // Tank powerup configuration
+            this.aimLine = null; // Aim line graphics
+            this.shell = null; // Shell graphics
+            this.shellTrajectory = null; // Shell movement trajectory
+            this.pausedBalls = []; // Array to store paused ball states
             this.extraBalls = [];
-            this.fallingTexts = [];
             
             // Reset movement tracking
             this.movementStartX = null;
@@ -372,6 +397,19 @@ export class Game {
             });
             this.activePowerUps = [];
         }
+        
+            // Reset tank mode
+            if (this.tankModeActive) {
+                this.cleanupShell();
+                if (this.aimLine) {
+                    this.aimLine.destroy();
+                    this.aimLine = null;
+                }
+                this.tankModeActive = false;
+                this.tankConfig = null;
+                this.aimDirection = null;
+                this.pausedBalls = [];
+            }
         
             // Clear power-up container
             if (this.powerUpContainer) {
@@ -915,7 +953,7 @@ export class Game {
         }
         
         // Only process game logic if in playing mode (not moving mode) and not waiting for input
-        if (this.inputMode === 'playing' && !this.waitingForInput) {
+        if (this.inputMode === 'playing' && !this.waitingForInput && !this.tankModeActive) {
         // Handle life lost
         if (lifeLost) {
             this.loseLife();
@@ -1125,6 +1163,19 @@ export class Game {
                 }
             });
             this.activePowerUps = [];
+        }
+        
+        // Reset tank mode
+        if (this.tankModeActive) {
+            this.cleanupShell();
+            if (this.aimLine) {
+                this.aimLine.destroy();
+                this.aimLine = null;
+            }
+            this.tankModeActive = false;
+            this.tankConfig = null;
+            this.aimDirection = null;
+            this.pausedBalls = [];
         }
         
         // Clear power-up container
@@ -1377,6 +1428,12 @@ export class Game {
             return;
         }
 
+        // Check if speed powerup has expired
+        if (this.speedPowerupEndTime && Date.now() > this.speedPowerupEndTime) {
+            this.speedMultiplier = 1; // Reset to normal speed
+            this.speedPowerupEndTime = null;
+        }
+
         // Calculate time-based multiplier
         const timeBasedMultiplier = this.lastSpeedIncreaseTime ? 
             Math.pow(SPEED_INCREASE_FACTOR, Math.floor((Date.now() - this.lastSpeedIncreaseTime) / SPEED_INCREASE_INTERVAL)) : 1;
@@ -1384,8 +1441,8 @@ export class Game {
         // Get speeds for current level (now in percentages)
         const speeds = this.getMaxSpeedForLevel(this.level);
         
-        // Calculate target speed percentage with time multiplier
-        const targetSpeedPercent = speeds.initial * timeBasedMultiplier;
+        // Calculate target speed percentage with time multiplier and speed powerup multiplier
+        const targetSpeedPercent = speeds.initial * timeBasedMultiplier * (this.speedMultiplier || 1);
         
         // Cap at maximum allowed speed percentage for level
         const finalTargetSpeedPercent = Math.min(targetSpeedPercent, speeds.max);
@@ -1485,6 +1542,20 @@ export class Game {
             case 'powerup_smallpaddle':
                 this.paddle.shrink();
                 break;
+            case 'powerup_fast':
+                // Increase ball speed by 25% for 10 seconds
+                this.speedMultiplier = 1.25;
+                this.speedPowerupEndTime = Date.now() + (powerupConfig?.duration || 10000);
+                break;
+            case 'powerup_slow':
+                // Decrease ball speed by 25% for 10 seconds
+                this.speedMultiplier = 0.75;
+                this.speedPowerupEndTime = Date.now() + (powerupConfig?.duration || 10000);
+                break;
+            case 'powerup_tank':
+                // Activate tank mode - pause game and allow shell firing
+                this.activateTankMode(powerupConfig);
+                break;
             case 'extraball':
                 // Create extra ball with duration from config
                 if (this.ball) {
@@ -1546,11 +1617,526 @@ export class Game {
             this.activePowerUps = [];
         }
         
+        // Clean up tank mode resources
+        if (this.tankModeActive) {
+            this.cleanupShell();
+            if (this.aimLine) {
+                this.aimLine.destroy();
+                this.aimLine = null;
+            }
+            this.tankModeActive = false;
+            this.tankConfig = null;
+            this.aimDirection = null;
+            this.pausedBalls = [];
+        }
+        
         // Clear level
         if (this.levelInstance) {
             this.levelInstance.clearBricks();
         }
         
         console.log('🧹 Game: Cleanup complete');
+    }
+
+    // Tank mode methods
+    activateTankMode(config) {
+        console.log('🚗 Tank mode activated!');
+        
+        this.tankModeActive = true;
+        this.tankConfig = config;
+        
+        // Pause the game
+        this.inputMode = 'tankMode';
+        
+        // Pause all balls
+        this.pauseAllBalls();
+        
+        // Create aim line
+        this.createAimLine();
+        
+        // Show tank mode instructions
+        this.showTankInstructions();
+        
+        // Add tank mode event listeners
+        this.boundHandleTankAim = this.handleTankAim.bind(this);
+        this.boundHandleTankFire = this.handleTankFire.bind(this);
+        
+        this.app.stage.on('pointermove', this.boundHandleTankAim);
+        this.app.stage.on('pointerup', this.boundHandleTankFire);
+    }
+
+    pauseAllBalls() {
+        console.log('🚗 Pausing all balls for tank mode');
+        this.pausedBalls = [];
+        
+        if (Ball.balls && Ball.balls.length > 0) {
+            Ball.balls.forEach(ball => {
+                if (ball) {
+                    // Store ball state
+                    this.pausedBalls.push({
+                        ball: ball,
+                        wasMoving: ball.isMoving,
+                        dx: ball.dx,
+                        dy: ball.dy
+                    });
+                    
+                    // Use ball's pause method
+                    ball.pause();
+                }
+            });
+        }
+    }
+
+    resumeAllBalls() {
+        console.log('🚗 Resuming all balls from tank mode');
+        
+        if (this.pausedBalls && this.pausedBalls.length > 0) {
+            this.pausedBalls.forEach(pausedBall => {
+                if (pausedBall.ball) {
+                    // Use ball's resume method
+                    pausedBall.ball.resume(pausedBall.dx, pausedBall.dy);
+                }
+            });
+        }
+        
+        this.pausedBalls = [];
+    }
+
+    createAimLine() {
+        if (this.aimLine) {
+            this.objectsContainer.removeChild(this.aimLine);
+        }
+        
+        this.aimLine = new PIXI.Graphics();
+        this.aimLine.lineStyle(this.tankConfig.aimLineWidth, this.tankConfig.aimLineColor);
+        this.objectsContainer.addChild(this.aimLine);
+    }
+
+    showTankInstructions() {
+        const instructions = new PIXI.Text('Drag to aim, release to fire!', {
+            fontFamily: 'Arial',
+            fontSize: 24,
+            fill: 0xFFFFFF,
+            stroke: 0x000000,
+            strokeThickness: 3
+        });
+        
+        instructions.anchor.set(0.5);
+        instructions.x = this.app.screen.width / 2;
+        instructions.y = this.app.screen.height - 50;
+        
+        this.uiContainer.addChild(instructions);
+        
+        // Remove instructions after 3 seconds
+        setTimeout(() => {
+            if (instructions.parent) {
+                instructions.parent.removeChild(instructions);
+                instructions.destroy();
+            }
+        }, 3000);
+    }
+
+    handleTankAim(e) {
+        if (!this.tankModeActive || !this.aimLine) return;
+        
+        // Clear previous aim line
+        this.aimLine.clear();
+        this.aimLine.lineStyle(this.tankConfig.aimLineWidth, this.tankConfig.aimLineColor);
+        
+        // Calculate aim direction from paddle to mouse/touch
+        const paddleX = this.paddle.sprite.x;
+        const paddleY = this.paddle.sprite.y;
+        const targetX = e.global.x;
+        const targetY = e.global.y;
+        
+        // Draw aim line from paddle to target
+        this.aimLine.moveTo(paddleX, paddleY);
+        this.aimLine.lineTo(targetX, targetY);
+        
+        // Store aim direction for firing
+        this.aimDirection = {
+            x: targetX - paddleX,
+            y: targetY - paddleY
+        };
+    }
+
+    handleTankFire(e) {
+        if (!this.tankModeActive || !this.aimDirection) return;
+        
+        console.log('💥 Tank shell fired!');
+        
+        // Remove aim line
+        if (this.aimLine) {
+            this.objectsContainer.removeChild(this.aimLine);
+            this.aimLine.destroy();
+            this.aimLine = null;
+        }
+        
+        // Remove tank mode event listeners
+        this.app.stage.off('pointermove', this.boundHandleTankAim);
+        this.app.stage.off('pointerup', this.boundHandleTankFire);
+        
+        // Fire shell
+        this.fireShell();
+    }
+
+    fireShell() {
+        // Create shell graphics
+        this.shell = new PIXI.Graphics();
+        this.shell.beginFill(this.tankConfig.shellColor);
+        this.shell.drawCircle(0, 0, this.tankConfig.shellSize);
+        this.shell.endFill();
+        
+        // Position shell at paddle
+        this.shell.x = this.paddle.sprite.x;
+        this.shell.y = this.paddle.sprite.y;
+        
+        this.objectsContainer.addChild(this.shell);
+        
+        // Normalize aim direction
+        const length = Math.sqrt(this.aimDirection.x * this.aimDirection.x + this.aimDirection.y * this.aimDirection.y);
+        this.shellTrajectory = {
+            dx: (this.aimDirection.x / length) * this.tankConfig.shellSpeed,
+            dy: (this.aimDirection.y / length) * this.tankConfig.shellSpeed
+        };
+        
+        console.log('💥 Shell fired with trajectory:', this.shellTrajectory);
+        
+        // Start shell movement
+        this.updateShell();
+        
+        // Add timeout to ensure game resumes even if shell doesn't hit anything
+        setTimeout(() => {
+            if (this.shell) {
+                console.log('💥 Shell timeout - forcing cleanup and resume');
+                this.cleanupShell();
+                this.resumeFromTankMode();
+            }
+        }, 5000); // 5 second timeout
+    }
+
+    updateShell() {
+        if (!this.shell || !this.shellTrajectory) return;
+        
+        // Store previous position for collision detection
+        const prevX = this.shell.x;
+        const prevY = this.shell.y;
+        
+        // Move shell
+        this.shell.x += this.shellTrajectory.dx;
+        this.shell.y += this.shellTrajectory.dy;
+        
+        // Log shell position occasionally
+        if (Math.random() < 0.1) { // 10% chance to log
+            console.log('💥 Shell position:', { 
+                x: this.shell.x, 
+                y: this.shell.y, 
+                dx: this.shellTrajectory.dx, 
+                dy: this.shellTrajectory.dy 
+            });
+        }
+        
+        // Check for collision with bricks along the movement path
+        const collision = this.checkShellCollisionPath(prevX, prevY, this.shell.x, this.shell.y);
+        
+        if (collision) {
+            console.log('💥 Shell collision detected - creating explosion');
+            // Shell hit something - create explosion
+            this.createExplosion(this.shell.x, this.shell.y);
+            return;
+        }
+        
+        // Check if shell is out of bounds
+        if (this.shell.x < 0 || this.shell.x > this.app.screen.width || 
+            this.shell.y < 0 || this.shell.y > this.app.screen.height) {
+            console.log('💥 Shell out of bounds - cleaning up');
+            this.cleanupShell();
+            // Resume game even if shell goes out of bounds
+            this.resumeFromTankMode();
+            return;
+        }
+        
+        // Continue shell movement
+        requestAnimationFrame(() => this.updateShell());
+    }
+
+    checkShellCollisionPath(startX, startY, endX, endY) {
+        if (!this.shell || !this.levelInstance) return false;
+        
+        const shellRadius = this.tankConfig.shellSize;
+        const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        
+        // Check multiple points along the path to prevent skipping
+        const steps = Math.max(1, Math.ceil(distance / shellRadius));
+        
+        for (let step = 0; step <= steps; step++) {
+            const t = step / steps;
+            const checkX = startX + (endX - startX) * t;
+            const checkY = startY + (endY - startY) * t;
+            
+            // Check collision at this point
+            for (let col = 0; col < this.levelInstance.bricks.length; col++) {
+                for (let row = 0; row < this.levelInstance.bricks[col].length; row++) {
+                    const brick = this.levelInstance.bricks[col][row];
+                    if (brick && brick.status === 1) { // Check if brick is active (status 1)
+                        // Skip finish level bricks - they cannot be destroyed by tank shells
+                        if (brick.type === 'finishlevel') {
+                            continue;
+                        }
+                        
+                        // Check if this brick can be destroyed by tank shells
+                        const canDestroy = brick.hitByPowerup('powerup_tank');
+                        if (!canDestroy) {
+                            continue; // Skip bricks that cannot be destroyed
+                        }
+                        
+                        const brickLeft = brick.x;
+                        const brickRight = brick.x + this.levelInstance.brickWidth;
+                        const brickTop = brick.y;
+                        const brickBottom = brick.y + this.levelInstance.brickHeight;
+                        
+                        // Check if shell intersects with brick
+                        if (checkX + shellRadius > brickLeft && 
+                            checkX - shellRadius < brickRight &&
+                            checkY + shellRadius > brickTop && 
+                            checkY - shellRadius < brickBottom) {
+                            
+                            console.log('💥 Shell collision detected with destroyable brick at:', { 
+                                col, row, brickX: brick.x, brickY: brick.y, checkX, checkY, brickType: brick.type 
+                            });
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    createExplosion(x, y) {
+        console.log('💥 Creating explosion at', x, y);
+        
+        // Clean up shell
+        this.cleanupShell();
+        
+        // Play tank explosion sound
+        playSoundByName('tank_explosion');
+        
+        // Create main explosion effect
+        const explosion = new PIXI.Graphics();
+        explosion.beginFill(this.tankConfig.explosionColor);
+        explosion.drawCircle(0, 0, this.tankConfig.explosionRadius * this.levelInstance.brickWidth);
+        explosion.endFill();
+        explosion.x = x;
+        explosion.y = y;
+        explosion.alpha = 0.8;
+        
+        this.objectsContainer.addChild(explosion);
+        
+        // Create explosion particles
+        this.createExplosionParticles(x, y);
+        
+        // Create shockwave effect
+        this.createShockwave(x, y);
+        
+        // Destroy bricks in explosion radius
+        this.destroyBricksInRadius(x, y, this.tankConfig.explosionRadius);
+        
+        // Animate explosion
+        const startTime = Date.now();
+        const animateExplosion = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / this.tankConfig.explosionDuration;
+            
+            if (progress < 1) {
+                explosion.alpha = 0.8 * (1 - progress);
+                explosion.scale.set(1 + progress * 0.5);
+                requestAnimationFrame(animateExplosion);
+            } else {
+                // Remove explosion
+                if (explosion.parent) {
+                    explosion.parent.removeChild(explosion);
+                    explosion.destroy();
+                }
+                
+                // Resume game
+                this.resumeFromTankMode();
+            }
+        };
+        
+        requestAnimationFrame(animateExplosion);
+    }
+
+    createExplosionParticles(x, y) {
+        const particleCount = 12;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = new PIXI.Graphics();
+            particle.beginFill(0xFFAA00); // Bright orange
+            particle.drawCircle(0, 0, 3);
+            particle.endFill();
+            
+            particle.x = x;
+            particle.y = y;
+            
+            // Random direction and speed
+            const angle = (i / particleCount) * Math.PI * 2;
+            const speed = 2 + Math.random() * 3;
+            particle.vx = Math.cos(angle) * speed;
+            particle.vy = Math.sin(angle) * speed;
+            particle.life = 1.0;
+            particle.decay = 0.02 + Math.random() * 0.03;
+            
+            this.objectsContainer.addChild(particle);
+            particles.push(particle);
+        }
+        
+        // Animate particles
+        const animateParticles = () => {
+            let allDead = true;
+            
+            particles.forEach(particle => {
+                if (particle.life > 0) {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.life -= particle.decay;
+                    particle.alpha = particle.life;
+                    particle.scale.set(1 - particle.life * 0.5);
+                    allDead = false;
+                }
+            });
+            
+            if (!allDead) {
+                requestAnimationFrame(animateParticles);
+            } else {
+                // Clean up particles
+                particles.forEach(particle => {
+                    if (particle.parent) {
+                        particle.parent.removeChild(particle);
+                        particle.destroy();
+                    }
+                });
+            }
+        };
+        
+        requestAnimationFrame(animateParticles);
+    }
+
+    createShockwave(x, y) {
+        const shockwave = new PIXI.Graphics();
+        shockwave.lineStyle(3, 0xFFFF00, 0.8); // Yellow shockwave
+        shockwave.drawCircle(0, 0, 10);
+        shockwave.x = x;
+        shockwave.y = y;
+        
+        this.objectsContainer.addChild(shockwave);
+        
+        // Animate shockwave
+        let radius = 10;
+        const maxRadius = this.tankConfig.explosionRadius * this.levelInstance.brickWidth * 1.5;
+        const expandSpeed = 8;
+        
+        const animateShockwave = () => {
+            radius += expandSpeed;
+            
+            if (radius < maxRadius) {
+                shockwave.clear();
+                shockwave.lineStyle(3, 0xFFFF00, 0.8 * (1 - radius / maxRadius));
+                shockwave.drawCircle(0, 0, radius);
+                requestAnimationFrame(animateShockwave);
+            } else {
+                // Remove shockwave
+                if (shockwave.parent) {
+                    shockwave.parent.removeChild(shockwave);
+                    shockwave.destroy();
+                }
+            }
+        };
+        
+        requestAnimationFrame(animateShockwave);
+    }
+
+    destroyBricksInRadius(centerX, centerY, radius) {
+        if (!this.levelInstance) return;
+        
+        const brickWidth = this.levelInstance.brickWidth;
+        const brickHeight = this.levelInstance.brickHeight;
+        const radiusPixels = radius * brickWidth;
+        
+        let destroyedCount = 0;
+        
+        // Fix: Use correct array indexing - bricks[col][row]
+        for (let col = 0; col < this.levelInstance.bricks.length; col++) {
+            for (let row = 0; row < this.levelInstance.bricks[col].length; row++) {
+                const brick = this.levelInstance.bricks[col][row];
+                if (brick && brick.status === 1) { // Check if brick is active
+                    const brickCenterX = brick.x + brickWidth / 2;
+                    const brickCenterY = brick.y + brickHeight / 2;
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(brickCenterX - centerX, 2) + 
+                        Math.pow(brickCenterY - centerY, 2)
+                    );
+                    
+                    if (distance <= radiusPixels) {
+                        // Check if this brick type can be destroyed by tank shells
+                        if (brick.type === 'finishlevel') {
+                            continue; // Skip finish level bricks
+                        }
+                        
+                        // Use the brick's hitByPowerup method to check if it can be destroyed
+                        const canDestroy = brick.hitByPowerup('powerup_tank');
+                        
+                        if (canDestroy) {
+                            // Handle special brick types properly
+                            if (brick.type === 'glass') {
+                                // Tank shells are powerful enough to destroy glass bricks immediately
+                                // Don't use the two-hit system for tank shells
+                                this.levelInstance.handleBrickDestroyed(col, row);
+                                destroyedCount++;
+                            } else {
+                                // For all other brick types, destroy immediately
+                                this.levelInstance.handleBrickDestroyed(col, row);
+                                destroyedCount++;
+                            }
+                            
+                            // Add score for destroyed brick
+                            this.addScore(10);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    cleanupShell() {
+        if (this.shell) {
+            if (this.shell.parent) {
+                this.shell.parent.removeChild(this.shell);
+            }
+            this.shell.destroy();
+            this.shell = null;
+        }
+        this.shellTrajectory = null;
+    }
+
+    resumeFromTankMode() {
+        console.log('🚗 Tank mode deactivated - resuming game');
+        
+        this.tankModeActive = false;
+        this.tankConfig = null;
+        this.aimDirection = null;
+        
+        // Resume all balls
+        this.resumeAllBalls();
+        
+        // Resume normal game mode
+        this.inputMode = 'playing';
+        
+        // Restore normal event listeners
+        this.app.stage.on('pointermove', this.boundHandlePointerMove);
+        this.app.stage.on('pointerdown', this.boundHandleGameStart);
     }
 } 

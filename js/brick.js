@@ -50,8 +50,10 @@ export class Brick {
         if (this.sprite && this.sprite.parent) {
             this.sprite.parent.removeChild(this.sprite);
         }
-        this.sprite?.destroy();
-        this.sprite = null;
+        if (this.sprite) {
+            this.sprite.destroy();
+            this.sprite = null;
+        }
     }
 
     hide() {
@@ -114,6 +116,11 @@ export class Brick {
             return false;
         }
         
+        // Finish level bricks cannot be destroyed by any powerups
+        if (this.type === 'finishlevel') {
+            return false;
+        }
+        
         if (this.type === 'strong') {
             // Import the powerup config to check if this powerup can break strong bricks
             const config = getPowerUpConfig(powerupType);
@@ -123,6 +130,16 @@ export class Brick {
             }
             return false; // Default: don't destroy strong bricks
         }
+        
+        if (this.type === 'glass') {
+            // For tank shells, destroy glass bricks immediately
+            if (powerupType === 'powerup_tank') {
+                return true; // Allow immediate destruction
+            }
+            // For other powerups, use normal hit logic
+            return this.hit();
+        }
+        
         return this.hit(); // Use normal hit logic for other brick types
     }
 

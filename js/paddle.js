@@ -1,12 +1,12 @@
-import { PADDLE_HOVER_OFFSET, PADDLE_BOTTOM_MARGIN, POWER_UP_DURATION } from './config.js';
+import { PADDLE_HOVER_OFFSET, PADDLE_BOTTOM_MARGIN, POWER_UP_DURATION, PADDLE_SPEED, PADDLE_HEIGHT } from './config.js';
 import { ASSETS } from './assets.js';
 
 export class Paddle {
     constructor(app) {
         this.app = app;
         this.width = 100;
-        this.height = 50;
-        this.speed = 5;
+        this.height = PADDLE_HEIGHT;
+        this.speed = PADDLE_SPEED;
         this.baseWidth = 100;
 
         // Power-up duration tracking
@@ -69,11 +69,20 @@ export class Paddle {
         // Store previous position for velocity calculation
         this.lastX = this.sprite.x;
 
-        const lerp = 0.2;
-
-        // Lerp toward target
-        this.sprite.x += (this.targetX - this.sprite.x) * lerp;
-        this.sprite.y += (this.targetY - this.sprite.y) * lerp;
+        // Speed-based movement for better responsiveness
+        const paddleSpeed = this.speed; // Use instance speed property
+        
+        // Move toward target X position
+        const distanceX = this.targetX - this.sprite.x;
+        const directionX = Math.sign(distanceX);
+        const moveDistanceX = Math.min(Math.abs(distanceX), paddleSpeed);
+        this.sprite.x += directionX * moveDistanceX;
+        
+        // Move toward target Y position
+        const distanceY = this.targetY - this.sprite.y;
+        const directionY = Math.sign(distanceY);
+        const moveDistanceY = Math.min(Math.abs(distanceY), paddleSpeed);
+        this.sprite.y += directionY * moveDistanceY;
 
         // Calculate velocity
         this.velocityX = this.sprite.x - this.lastX;
@@ -84,7 +93,7 @@ export class Paddle {
         this.sprite.x = Math.max(minX, Math.min(this.sprite.x, maxX));
 
         // Bound Y
-        const minY = this.app.screen.height * 0.55;
+        const minY = this.app.screen.height * 0.45;
         const maxY = this.app.screen.height - PADDLE_BOTTOM_MARGIN;
         this.sprite.y = Math.max(minY, Math.min(this.sprite.y, maxY));
     }

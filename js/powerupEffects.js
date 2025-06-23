@@ -285,28 +285,46 @@ export class PowerupEffects {
                 // Remove flash effect
                 if (effect.type === 'flash' && effect.flash) {
                     try {
-                        if (effect.flash.parent) {
-                            effect.flash.parent.removeChild(effect.flash);
+                        // Check if the graphics object is still valid before destroying
+                        if (effect.flash && typeof effect.flash.destroy === 'function') {
+                            if (effect.flash.parent) {
+                                effect.flash.parent.removeChild(effect.flash);
+                            }
+                            // Only destroy if the object is still valid
+                            if (effect.flash._destroyed !== true) {
+                                effect.flash.destroy();
+                            }
                         }
-                        effect.flash.destroy();
                     } catch (error) {
                         console.error('❌ PowerupEffects: Error removing flash effect', error);
                     }
                 } else if (effect.type === 'particle_burst' && effect.container) {
                     try {
-                        if (effect.container.parent) {
-                            effect.container.parent.removeChild(effect.container);
+                        // Check if the container is still valid before destroying
+                        if (effect.container && typeof effect.container.destroy === 'function') {
+                            if (effect.container.parent) {
+                                effect.container.parent.removeChild(effect.container);
+                            }
+                            // Only destroy if the object is still valid
+                            if (effect.container._destroyed !== true) {
+                                effect.container.destroy();
+                            }
                         }
-                        effect.container.destroy();
                     } catch (error) {
                         console.error('❌ PowerupEffects: Error removing particle effect', error);
                     }
                 } else if (effect.type === 'wave' && effect.wave) {
                     try {
-                        if (effect.wave.parent) {
-                            effect.wave.parent.removeChild(effect.wave);
+                        // Check if the wave object is still valid before destroying
+                        if (effect.wave && typeof effect.wave.destroy === 'function') {
+                            if (effect.wave.parent) {
+                                effect.wave.parent.removeChild(effect.wave);
+                            }
+                            // Only destroy if the object is still valid
+                            if (effect.wave._destroyed !== true) {
+                                effect.wave.destroy();
+                            }
                         }
-                        effect.wave.destroy();
                     } catch (error) {
                         console.error('❌ PowerupEffects: Error removing wave effect', error);
                     }
@@ -317,7 +335,7 @@ export class PowerupEffects {
                     try {
                         effect.containers.forEach(container => {
                             const originalPos = this.originalPositions.get(container);
-                            if (originalPos) {
+                            if (originalPos && container && typeof container.x !== 'undefined') {
                                 container.x = originalPos.x;
                                 container.y = originalPos.y;
                             }
@@ -353,20 +371,38 @@ export class PowerupEffects {
             stageChildren.forEach((child, index) => {
                 // Look for graphics objects that might be leftover effects
                 if (child instanceof PIXI.Graphics) {
-                    // Check if this graphics object looks like an effect (small, colored circles or rectangles)
-                    const bounds = child.getBounds();
-                    const isSmall = bounds.width < 50 && bounds.height < 50;
-                    const hasAlpha = child.alpha !== undefined && child.alpha < 1;
-                    
-                    if (isSmall || hasAlpha) {
-                        if (child.parent) {
-                            child.parent.removeChild(child);
+                    try {
+                        // Check if this graphics object looks like an effect (small, colored circles or rectangles)
+                        const bounds = child.getBounds();
+                        const isSmall = bounds.width < 50 && bounds.height < 50;
+                        const hasAlpha = child.alpha !== undefined && child.alpha < 1;
+                        
+                        if (isSmall || hasAlpha) {
+                            if (child.parent) {
+                                child.parent.removeChild(child);
+                            }
+                            // Only destroy if the object is still valid
+                            if (child._destroyed !== true && typeof child.destroy === 'function') {
+                                child.destroy();
+                            }
+                            cleanedCount++;
                         }
-                        child.destroy();
-                        cleanedCount++;
+                    } catch (error) {
+                        // If we can't get bounds or destroy, just try to remove from parent
+                        try {
+                            if (child.parent) {
+                                child.parent.removeChild(child);
+                            }
+                        } catch (removeError) {
+                            // Ignore removal errors
+                        }
                     }
                 }
             });
+            
+            if (cleanedCount > 0) {
+                console.log('🧹 Game: Cleaned up', cleanedCount, 'leftover graphics objects');
+            }
         }
         
         // Clear original positions map
@@ -498,13 +534,31 @@ export class PowerupEffects {
             
             stageChildren.forEach(child => {
                 if (child instanceof PIXI.Graphics) {
-                    if (child.parent) {
-                        child.parent.removeChild(child);
+                    try {
+                        if (child.parent) {
+                            child.parent.removeChild(child);
+                        }
+                        // Only destroy if the object is still valid
+                        if (child._destroyed !== true && typeof child.destroy === 'function') {
+                            child.destroy();
+                        }
+                        cleanedCount++;
+                    } catch (error) {
+                        // If destruction fails, just try to remove from parent
+                        try {
+                            if (child.parent) {
+                                child.parent.removeChild(child);
+                            }
+                        } catch (removeError) {
+                            // Ignore removal errors
+                        }
                     }
-                    child.destroy();
-                    cleanedCount++;
                 }
             });
+            
+            if (cleanedCount > 0) {
+                console.log('🧹 Game: Force cleaned up', cleanedCount, 'graphics objects');
+            }
         }
         
         // Clear all maps

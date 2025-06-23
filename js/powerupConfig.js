@@ -10,7 +10,7 @@ export const POWERUP_BEHAVIOR_CONFIG = {
         playSound: true,                   
         sound: 'brannas',                  // References asset name
         activateOn: 'screen',
-        duration: 10000,
+        duration: 5000,
         score: 0,
         canBreakStrongBricks: true,        // Brannas can break strong bricks
         fallSpeed: 6,                      // Pixels per frame falling speed
@@ -127,6 +127,63 @@ export const POWERUP_BEHAVIOR_CONFIG = {
         canBreakStrongBricks: false,       // Coins cannot break strong bricks
         fallSpeed: 8,                      // Pixels per frame falling speed (fast for coins)
     },
+    powerup_fast: {
+        spriteKey: 'powerup_fast',
+        showSprite: true,
+        showText: true,
+        text: 'VINNIG!',
+        textPosition: 'center',
+        textSize: 28,
+        textBlink: false,
+        playSound: true,                   
+        sound: 'normal',                   // Use existing sound for now
+        activateOn: 'screen',
+        duration: 10000,                   // 10 seconds
+        score: 0,
+        canBreakStrongBricks: false,       // Speed powerups cannot break strong bricks
+        fallSpeed: 6,                      // Pixels per frame falling speed
+    },
+    powerup_slow: {
+        spriteKey: 'powerup_slow',
+        showSprite: true,
+        showText: true,
+        text: 'STADIG!',
+        textPosition: 'center',
+        textSize: 28,
+        textBlink: false,
+        playSound: true,                   
+        sound: 'normal',                   // Use existing sound for now
+        activateOn: 'screen',
+        duration: 10000,                   // 10 seconds
+        score: 0,
+        canBreakStrongBricks: false,       // Speed powerups cannot break strong bricks
+        fallSpeed: 6,                      // Pixels per frame falling speed
+    },
+    powerup_tank: {
+        spriteKey: 'powerup_tank',
+        showSprite: true,
+        showText: true,
+        text: 'TANK!',
+        textPosition: 'center',
+        textSize: 28,
+        textBlink: false,
+        playSound: true,                   
+        sound: 'normal',                   // Use existing sound for now
+        activateOn: 'screen',
+        duration: 0,                       // Instant activation, no duration
+        score: 0,
+        canBreakStrongBricks: true,        // Tank shells can break strong bricks
+        fallSpeed: 6,                      // Pixels per frame falling speed
+        // Tank-specific parameters
+        shellSpeed: 4,                     // Pixels per frame shell speed (reduced from 8)
+        explosionRadius: 3,                // Number of bricks destroyed in radius
+        shellSize: 6,                      // Shell radius in pixels
+        explosionDuration: 1000,           // Explosion effect duration in ms
+        aimLineColor: 0xFF0000,            // Red aim line
+        aimLineWidth: 2,                   // Aim line width
+        shellColor: 0xFFFF00,              // Yellow shell
+        explosionColor: 0xFF6600,          // Orange explosion
+    },
 };
 
 // Brick score configuration
@@ -148,7 +205,10 @@ export const POWERUPS_PER_LEVEL = {
     COIN_GOLD: 20,   // Five gold coin power-ups per level
     COIN_SILVER: 40,  // Ten silver coin power-ups per level
     POWERUP_LARGEPADDLE: 3, // Three large paddle power-ups per level
-    POWERUP_SMALLPADDLE: 3  // Three small paddle power-ups per level
+    POWERUP_SMALLPADDLE: 3,  // Three small paddle power-ups per level
+    POWERUP_FAST: 2,         // Two fast ball power-ups per level
+    POWERUP_SLOW: 2,         // Two slow ball power-ups per level
+    POWERUP_TANK: 1,         // One tank power-up per level (rare)
 };
 
 // Smart powerup distribution configuration
@@ -165,9 +225,12 @@ export const POWERUP_DISTRIBUTION_CONFIG = {
         EXTRA_LIFE: 0.03,     // 3% - rare (increased from 1% to ensure placement)
         SKULL: 0.03,          // 3% - uncommon
         COIN_GOLD: 0.1,      // 10% - common
-        COIN_SILVER: 0.2,    // 20% - common
+        COIN_SILVER: 0.3,    // 30% - common
         POWERUP_LARGEPADDLE: 0.05, // 5% - rare
-        POWERUP_SMALLPADDLE: 0.05  // 5% - rare
+        POWERUP_SMALLPADDLE: 0.05,  // 5% - rare
+        POWERUP_FAST: 0.04,         // 4% - rare
+        POWERUP_SLOW: 0.04,         // 4% - rare
+        POWERUP_TANK: 0.03,         // 3% - very rare
     },
     
     // Fallback powerup type if no powerups are placed due to rounding
@@ -176,6 +239,11 @@ export const POWERUP_DISTRIBUTION_CONFIG = {
 
 // Smart powerup distribution function
 export function distributePowerups(normalBricks, glassBricks) {
+    console.log('🎯 distributePowerups called with:', {
+        normalBricks: normalBricks.length,
+        glassBricks: glassBricks.length
+    });
+    
     // Create weighted brick array for powerup distribution
     const weightedBricks = [];
     normalBricks.forEach(brick => {
@@ -189,6 +257,7 @@ export function distributePowerups(normalBricks, glassBricks) {
     });
 
     if (weightedBricks.length === 0) {
+        console.log('🎯 No bricks available for powerup distribution');
         return;
     }
 
@@ -201,6 +270,12 @@ export function distributePowerups(normalBricks, glassBricks) {
         POWERUP_DISTRIBUTION_CONFIG.MIN_POWERUPS, 
         Math.min(totalBricks, Math.floor(totalBricks * POWERUP_DISTRIBUTION_CONFIG.MAX_POWERUP_PERCENTAGE))
     );
+
+    console.log('🎯 Powerup distribution calculation:', {
+        totalBricks,
+        maxPowerups,
+        maxPercentage: POWERUP_DISTRIBUTION_CONFIG.MAX_POWERUP_PERCENTAGE
+    });
 
     let powerupIndex = 0;
     let totalPlaced = 0;
@@ -236,6 +311,13 @@ export function distributePowerups(normalBricks, glassBricks) {
         totalPlaced = 1;
         powerupComposition[POWERUP_DISTRIBUTION_CONFIG.FALLBACK_POWERUP] = 1;
     }
+    
+    console.log('🎯 Powerup distribution results:', {
+        totalPlaced,
+        powerupComposition,
+        tankCount: powerupComposition.POWERUP_TANK || 0,
+        tankRatio: POWERUP_DISTRIBUTION_CONFIG.RATIOS.POWERUP_TANK
+    });
 }
 
 // Game sounds that aren't powerups but need sound pools
@@ -303,11 +385,14 @@ export function getPowerUpConfig(type) {
         'coin_silver': 'coin_silver',
         'largepaddle': 'powerup_largepaddle',
         'smallpaddle': 'powerup_smallpaddle',
+        'fast': 'powerup_fast',
+        'slow': 'powerup_slow',
         'extralife': 'extra_life',
         'coingold': 'coin_gold',
         'coinsilver': 'coin_silver',
         'large_paddle': 'powerup_largepaddle',
-        'small_paddle': 'powerup_smallpaddle'
+        'small_paddle': 'powerup_smallpaddle',
+        'tank': 'powerup_tank',
     };
     
     // Try the mapping first

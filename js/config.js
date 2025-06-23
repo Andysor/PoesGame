@@ -1,5 +1,5 @@
 // Game version
-export const GAME_VERSION = '0.1.1';
+export const GAME_VERSION = '0.1.2';
 
 // Debug mode flag - set to true to enable debug logging and features
 export const DEBUG_MODE = false;
@@ -12,9 +12,9 @@ export const BRICK_AREA_WIDTH_PERCENT = 0.95; // 95% of screen width (reduced fr
 export const BRICK_AREA_TOP_PERCENT = 0.05; // 5% from top of screen
 
 // Ball settings - now in percentage of screen width per second
-export const BASE_INITIAL_SPEED_PERCENT = 0.8; // 80% of screen width per second
+export const BASE_INITIAL_SPEED_PERCENT = 0.4; // 80% of screen width per second
 export const BASE_MAX_SPEED_PERCENT = 2; // 200% of screen width per second
-export const LEVEL_SPEED_INCREASE = 0.08; // 20% increase per level
+export const LEVEL_SPEED_INCREASE = 0.06; // 20% increase per level
 export const BALL_RADIUS = window.innerWidth * 0.02; // 1% of screen width
 
 // Function to convert percentage speed to actual pixels per frame
@@ -32,7 +32,7 @@ export const COMPONENT_SPEED = BASE_INITIAL_SPEED / Math.sqrt(2);
 
 // Paddle settings
 export const PADDLE_WIDTH = window.innerWidth * 0.2; // 20% of screen width
-export const PADDLE_HEIGHT = window.innerHeight * 0.05; // 5% of screen height
+export const PADDLE_HEIGHT = window.innerHeight * 0.025; // 2.5% of screen height
 export const PADDLE_SPEED = 7;
 
 // Brick settings
@@ -52,7 +52,7 @@ export const POINTS_PER_BRICK = 10;
 
 // Speed-related constants
 export const SPEED_INCREASE_INTERVAL = 10000; // Every 10 seconds
-export const SPEED_INCREASE_FACTOR = 1.05; // 10% increase
+export const SPEED_INCREASE_FACTOR = 1.04; // 10% increase
 
 // Paddle constants
 export const PADDLE_BOTTOM_MARGIN = 100; // Distance from bottom of screen to paddle

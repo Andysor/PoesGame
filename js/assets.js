@@ -20,6 +20,9 @@ export const ASSETS = {
             powerup_smallpaddle: './assets/images/items/powerup_smallpaddle.png',
             extra_life: './assets/images/items/extra_life.png',
             skull: './assets/images/items/skull.png',
+            powerup_fast: './assets/images/items/powerup_fast.png',
+            powerup_slow: './assets/images/items/powerup_slow.png',
+            powerup_tank: './assets/images/items/powerup_tank.png',
         },
         bricks: {
             brick_normal: './assets/images/bricks/brick_normal.png',
@@ -36,7 +39,7 @@ export const ASSETS = {
     },
     sounds: {
         normal: './assets/sounds/normal.mp3',
-        lifeloss: './assets/sounds/masepoes.m4a',
+        lifeloss: './assets/sounds/lifeloss.m4a',
         poesklap: './assets/sounds/poesklap.m4a',
         brannas: './assets/sounds/brannas.m4a',
         brick_glass_break: './assets/sounds/brick_glass_break.m4a',
@@ -49,6 +52,8 @@ export const ASSETS = {
         klein: './assets/sounds/klein.mp3',
         strong: './assets/sounds/strong.m4a',
         bigbonus: './assets/sounds/bigbonus.m4a',
+        hit: './assets/sounds/hit.m4a',
+        tank_explosion: './assets/sounds/tank_explosion.mp3',
         
     },
     levels: (levelNum) => `./assets/levels/level${levelNum}.json`

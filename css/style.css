@@ -44,6 +44,18 @@ body.game-active {
   background-image: none !important;
 }
 
+/* Game Version Display */
+#game-version {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
 /* Mobile-specific loading screen adjustments */
 @media (max-width: 768px) {
   html, body {

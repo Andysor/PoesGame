@@ -53,6 +53,9 @@
     <button id="start-button">Start speletjie</button>
   </div>
   
+  <!-- Game Version Display -->
+  <div id="game-version">v0.1.2</div>
+  
   <!-- iOS Audio Notification -->
   <div id="ios-audio-notice" style="display: none; position: fixed; top: 10px; left: 10px; right: 10px; background: #ff6b6b; color: white; padding: 15px; border-radius: 8px; z-index: 1000; text-align: center; font-size: 14px;">
     <strong>🔊 Audio Notice:</strong><br>
@@ -92,7 +95,7 @@
         <div class="brick-info">
           <h4>Normale Blokkie</h4>
           <p class="score">Score: 10 fokken punte</p>
-          <p class="effect">Effek: Breek soos jou ma se goedkoop wig – een klap en sy’s poespad</p>
+          <p class="effect">Effek: Breek soos jou ma se goedkoop wig – een klap en sy's poespad</p>
         </div>
       </div>
       <div class="brick-item">
@@ -123,7 +126,7 @@
         <div class="brick-preview finishlevel"></div>
         <div class="brick-info">
           <h4>Klaar Fokken Maak</h4>
-          <p class="score">Score: 10 punte en ‘n middle finger</p>
+          <p class="score">Score: 10 punte en 'n middle finger</p>
           <p class="effect">Effek: Raak hom en die vlak fokof – net soos jy het van skool</p>
         </div>
       </div>
@@ -153,7 +156,7 @@
         <div class="powerup-icon extra-life"></div>
         <div class="powerup-info">
           <h4>Ekstra Fokken Lewe</h4>
-          <p>Effek: Jy’s terug – unlike jou pa</p>
+          <p>Effek: Jy's terug – unlike jou pa</p>
         </div>
       </div>
       <div class="powerup-item">
@@ -188,7 +191,7 @@
         <div class="powerup-icon small-paddle"></div>
         <div class="powerup-info">
           <h4>Laaitie Paddle</h4>
-          <p>Effek: Raak klein soos jou selfbeeld na ‘n breakup</p>
+          <p>Effek: Raak klein soos jou selfbeeld na 'n breakup</p>
         </div>
       </div>
     </div>
@@ -223,7 +226,7 @@
         <div class="tip-icon">🎯</div>
         <div class="tip-text">
           <h4>Spesiale Brickie Bitchies</h4>
-          <p>Finish & Bonus blokkies? Skiet en f*k hulle op, hulle’s nie real obstacles nie</p>
+          <p>Finish & Bonus blokkies? Skiet en f*k hulle op, hulle's nie real obstacles nie</p>
         </div>
       </div>
       <div class="tip-item">
@@ -318,6 +321,12 @@
         }, 3000);
       }
     }
+  </script>
+  
+  <script type="module">
+    // Import and display game version
+    import { GAME_VERSION } from './js/config.js';
+    document.getElementById('game-version').textContent = `v${GAME_VERSION}`;
   </script>
 </body>
 </html>

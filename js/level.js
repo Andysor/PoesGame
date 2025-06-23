@@ -60,13 +60,21 @@ export class Level {
     
     handleBrickDestroyed(c, r) {
         const brick = this.bricks[c]?.[r];
-        if (!brick) return;
+        if (!brick) {
+            return;
+        }
     
         const { x, y } = brick;
         const info = brick.brickInfo || {};
     
         // 🔥 Sjekk om brikken inneholder powerup
         if (info.powerUpType) {
+            console.log('🎯 Creating powerup from destroyed brick:', {
+                powerUpType: info.powerUpType,
+                brickPosition: { c, r },
+                brickCoords: { x, y }
+            });
+            
             // Transform coordinates to be relative to objectsContainer
             const globalX = x + brick.width / 2 + this.brickContainer.x;
             const globalY = y + brick.height / 2 + this.brickContainer.y;
@@ -90,12 +98,16 @@ export class Level {
             }
         }
 
-        // Fjern brikkens sprite
-        if (brick.sprite?.parent) {
-            brick.sprite.parent.removeChild(brick.sprite);
-        }
+        // Note: brick.destroy() will handle sprite removal, so we don't need to do it here
+        // if (brick.sprite?.parent) {
+        //     console.log('💥 Removing brick sprite from parent');
+        //     brick.sprite.parent.removeChild(brick.sprite);
+        // } else {
+        //     console.log('💥 Brick sprite has no parent or no sprite');
+        // }
     
         brick.destroy();
+        
         this.bricks[c][r] = null;
     }
     
@@ -230,6 +242,11 @@ export class Level {
         console.log(`Created ${normalBricks.length} normal bricks, ${glassBricks.length} glass bricks, ${strongBricks.length} strong bricks, and ${emptySpaces} empty spaces (holes)`);
 
         // Smart powerup distribution based on available bricks
+        console.log('🎯 About to distribute powerups for level:', {
+            normalBricks: normalBricks.length,
+            glassBricks: glassBricks.length,
+            totalAvailable: normalBricks.length + glassBricks.length
+        });
         distributePowerups(normalBricks, glassBricks);
         
         console.log(`Level loaded successfully with grid size: ${this.brickRowCount}x${this.brickColumnCount}`);

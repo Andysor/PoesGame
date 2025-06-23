@@ -178,6 +178,19 @@ export class Ball {
             return { brickHit: false, lifeLost: false };
         }
 
+        // Log when ball starts moving (for debugging tank mode)
+        if (this.isMoving && (this.dx !== 0 || this.dy !== 0)) {
+            // Only log occasionally to avoid spam
+            if (Math.random() < 0.001) { // 0.1% chance to log
+                console.log('🎯 Ball is moving:', {
+                    isExtraBall: this.isExtraBall,
+                    dx: this.dx,
+                    dy: this.dy,
+                    position: { x: this.graphics.x, y: this.graphics.y }
+                });
+            }
+        }
+
         // Store previous position
         const prevX = this.graphics.x;
         const prevY = this.graphics.y;
@@ -191,6 +204,9 @@ export class Ball {
         
         // Update trail effect
         this.trail.update();
+        
+        // Continuous collision detection to prevent passing through bricks
+        const brickHit = this.handleContinuousCollision(prevX, prevY, level);
         
         // Wall collision with position correction
         let wallBounce = false;
@@ -269,20 +285,6 @@ export class Ball {
             this.graphics.y = paddleTop - this.radius;
             
             this.addRandomFactor();
-        }
-        
-        // Check for brick collisions
-        let brickHit = false;
-        for (let c = 0; c < level.brickColumnCount; c++) {
-            for (let r = 0; r < level.brickRowCount; r++) {
-                const brick = level.bricks[c]?.[r];
-                if (this.handleBrickCollision(brick, c, r)) {
-                    brickHit = true;
-                    this.addRandomFactor();
-                    break;
-                }
-            }
-            if (brickHit) break;
         }
         
         // Check for bottom collision (lose life)
@@ -449,6 +451,35 @@ export class Ball {
             
             // Handle special brick effects
             if (brick.brickInfo) {
+                // Check if this is a finish level brick - protect it from brannas
+                if (brick.brickInfo.type === 'finishlevel') {
+                    // Finish level brick - immediately completes the level
+                    console.log('🏁 Finish level brick hit - completing level!');
+                    
+                    if (this.game) {
+                        // Add score for the brick from config
+                        this.game.addScore(SPECIAL_BRICK_CONFIG.FINISH_LEVEL_SCORE);
+                        
+                        // Trigger special effect
+                        if (this.game.powerupEffects) {
+                            this.game.powerupEffects.triggerPowerupEffect('extra_life', brick.x, brick.y);
+                        }
+                        
+                        // Force level completion with configurable delay
+                        setTimeout(() => {
+                            if (this.game) {
+                                console.log('🏁 Forcing level completion from finish level brick');
+                                // Call nextLevel directly instead of checkLevelComplete
+                                this.game.nextLevel();
+                            }
+                        }, SPECIAL_BRICK_CONFIG.FINISH_LEVEL_DELAY);
+                    }
+                    
+                    // Destroy the brick
+                    this.level.handleBrickDestroyed(c, r);
+                    return true;
+                }
+                
                 if (brick.brickInfo.type === 'glass') {
                     // Don't process if brick is already destroyed
                     if (brick.status !== 1) {
@@ -540,31 +571,6 @@ export class Ball {
                         const extraBallScore = extraBallConfig?.score || BRICK_SCORE_CONFIG.extra || 10;
                         this.game.addScore(extraBallScore);
                     }
-                } else if (brick.brickInfo.type === 'finishlevel') {
-                    // Finish level brick - immediately completes the level
-                    console.log('🏁 Finish level brick hit - completing level!');
-                    
-                    if (this.game) {
-                        // Add score for the brick from config
-                        this.game.addScore(SPECIAL_BRICK_CONFIG.FINISH_LEVEL_SCORE);
-                        
-                        // Trigger special effect
-                        if (this.game.powerupEffects) {
-                            this.game.powerupEffects.triggerPowerupEffect('extra_life', brick.x, brick.y);
-                        }
-                        
-                        // Force level completion with configurable delay
-                        setTimeout(() => {
-                            if (this.game) {
-                                console.log('🏁 Forcing level completion from finish level brick');
-                                // Call nextLevel directly instead of checkLevelComplete
-                                this.game.nextLevel();
-                            }
-                        }, SPECIAL_BRICK_CONFIG.FINISH_LEVEL_DELAY);
-                    }
-                    
-                    // Destroy the brick
-                    this.level.handleBrickDestroyed(c, r);
                 } else if (brick.brickInfo.type === 'bigbonus') {
                     // Big bonus brick - gives a large score bonus
                     console.log('💰 Big bonus brick hit - awarding bonus points!');
@@ -738,6 +744,30 @@ export class Ball {
         return Date.now() > this.endTime;
     }
 
+    // Tank mode support methods
+    pause() {
+        console.log('🎯 Ball paused for tank mode:', {
+            isExtraBall: this.isExtraBall,
+            wasMoving: this.isMoving,
+            dx: this.dx,
+            dy: this.dy
+        });
+        this.isMoving = false;
+        this.dx = 0;
+        this.dy = 0;
+    }
+
+    resume(dx, dy) {
+        console.log('🎯 Ball resumed from tank mode:', {
+            isExtraBall: this.isExtraBall,
+            dx: dx,
+            dy: dy
+        });
+        this.isMoving = true;
+        this.dx = dx;
+        this.dy = dy;
+    }
+
     showBonusText(text, x, y) {
         if (!this.game || !this.game.app) return;
         
@@ -813,5 +843,71 @@ export class Ball {
         
         // Add a small random factor to prevent perfect horizontal bouncing
         this.addRandomFactor();
+    }
+
+    handleContinuousCollision(prevX, prevY, level) {
+        if (!this.level || !level) return false;
+        
+        // Calculate movement vector
+        const deltaX = this.graphics.x - prevX;
+        const deltaY = this.graphics.y - prevY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        // If ball didn't move, no collision check needed
+        if (distance === 0) return false;
+        
+        // Normalize movement vector
+        const moveX = deltaX / distance;
+        const moveY = deltaY / distance;
+        
+        // Check for collisions along the movement path
+        const steps = Math.ceil(distance / (this.radius * 0.5)); // Check every half radius
+        let collisionFound = false;
+        
+        for (let step = 1; step <= steps && !collisionFound; step++) {
+            const checkX = prevX + (moveX * distance * step / steps);
+            const checkY = prevY + (moveY * distance * step / steps);
+            
+            // Check all bricks at this position
+            for (let c = 0; c < level.brickColumnCount && !collisionFound; c++) {
+                for (let r = 0; r < level.brickRowCount && !collisionFound; r++) {
+                    const brick = level.bricks[c]?.[r];
+                    if (brick && brick.status === 1) {
+                        // Get brick dimensions
+                        const brickLeft = brick.x;
+                        const brickRight = brick.x + this.level.brickWidth;
+                        const brickTop = brick.y;
+                        const brickBottom = brick.y + this.level.brickHeight;
+                        
+                        // Get ball boundaries at check position
+                        const ballLeft = checkX - this.radius;
+                        const ballRight = checkX + this.radius;
+                        const ballTop = checkY - this.radius;
+                        const ballBottom = checkY + this.radius;
+                        
+                        // Check for collision
+                        if (ballRight >= brickLeft && 
+                            ballLeft <= brickRight && 
+                            ballBottom >= brickTop && 
+                            ballTop <= brickBottom) {
+                            
+                            // Collision detected! Handle it
+                            collisionFound = true;
+                            
+                            // Move ball back to the collision point
+                            this.graphics.x = checkX;
+                            this.graphics.y = checkY;
+                            
+                            // Handle the collision
+                            this.handleBrickCollision(brick, c, r);
+                            this.addRandomFactor();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return collisionFound;
     }
 } 
